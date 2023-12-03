@@ -1,4 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { User } from './user.entity';
+import { Front } from './front.entity';
 
 @Entity()
 export class Task {
@@ -16,6 +18,12 @@ export class Task {
 
   @Column('timestamp')
   processedAt: Date;
+
+  @ManyToOne(() => User, (user) => user.tasks)
+  user: User;
+
+  @ManyToOne(() => Front, (front) => front.tasks)
+  front: Front;
 
   constructor(task: Partial<Task>) {
     Object.assign(this, task);

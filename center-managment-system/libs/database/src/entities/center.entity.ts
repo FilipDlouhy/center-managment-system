@@ -4,8 +4,10 @@ import {
   Column,
   OneToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { Front } from './front.entity';
+import { User } from './user.entity';
 
 @Entity()
 export class Center {
@@ -18,6 +20,9 @@ export class Center {
   @OneToOne(() => Front, { cascade: true })
   @JoinColumn()
   front: Front;
+
+  @OneToMany(() => User, (user) => user.center, { cascade: true })
+  tasks: User[];
 
   constructor(center: Partial<Center>) {
     Object.assign(this, center);

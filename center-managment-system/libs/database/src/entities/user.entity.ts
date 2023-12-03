@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  ManyToOne,
+} from 'typeorm';
+import { Task } from './task.entity';
+import { Center } from './center.entity';
 
 @Entity()
 export class User {
@@ -16,6 +24,12 @@ export class User {
 
   @Column()
   admin: boolean;
+
+  @OneToMany(() => Task, (task) => task.user, { cascade: true })
+  tasks: Task[];
+
+  @ManyToOne(() => Center, (center) => center.users)
+  center: Center;
 
   constructor(user: Partial<User>) {
     Object.assign(this, user);
