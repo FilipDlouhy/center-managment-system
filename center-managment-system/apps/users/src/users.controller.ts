@@ -4,6 +4,7 @@ import { USER_MESSAGES } from '@app/rmq';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserDTO } from '@app/database/dtos/userDtos/user.dto';
 import { UpdateUserRequestDTO } from '@app/database/dtos/userDtos/updateUserRequest.dto';
+import { LoginUserDTO } from '@app/database/dtos/userDtos/loginUser.dto';
 
 @Controller()
 export class UsersController {
@@ -37,5 +38,11 @@ export class UsersController {
   @MessagePattern(USER_MESSAGES.deleteUser)
   async deleteUser(@Payload() userId: number) {
     return this.usersService.deleteUser(userId);
+  }
+
+  // Handle user login
+  @MessagePattern(USER_MESSAGES.userLogin)
+  async lofinUser(@Payload() loginUser: LoginUserDTO) {
+    return this.usersService.loginUser(loginUser);
   }
 }

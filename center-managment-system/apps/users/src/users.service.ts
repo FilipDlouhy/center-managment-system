@@ -1,3 +1,4 @@
+import { LoginUserDTO } from '@app/database/dtos/userDtos/loginUser.dto';
 import { UpdateUserRequestDTO } from '@app/database/dtos/userDtos/updateUserRequest.dto';
 import { UserDTO } from '@app/database/dtos/userDtos/user.dto';
 import { User } from '@app/database/entities/user.entity';
@@ -8,7 +9,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository, QueryFailedError } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -22,15 +24,24 @@ export class UsersService {
    * Creates a new user in the database.
    * @param data The data for the new user.
    * @returns The created UserDTO.
-   * @throws BadRequestException If the provided data is invalid.
+   * @throws BadRequestException If the provided data is invalid or email already exists.
    */
   async createUser(data: UserDTO) {
     try {
       const userDto = new UserDTO(data);
+      userDto.password = await bcrypt.hash(userDto.password, 10);
       const user = new User(userDto);
       await this.entityManager.save(user);
       return userDto;
     } catch (error) {
+      if (error instanceof QueryFailedError) {
+        const errorCode = (error as any).code;
+
+        if (errorCode === 'ER_DUP_ENTRY') {
+          throw new BadRequestException('Email already exists.');
+        }
+      }
+
       throw new BadRequestException(
         'Invalid user data. Please provide all required fields.',
       );
@@ -166,6 +177,42 @@ export class UsersService {
 
       throw new InternalServerErrorException(
         'Error while deleting user: ' + error.message,
+      );
+    }
+  }
+
+  /**
+   * Login a user by comparing the provided credentials with stored user data.
+   * @param loginUserDto An object containing the email and password for login.
+   * @returns A UserDTO representing the authenticated user.
+   * @throws NotFoundException If the user is not found.
+   * @throws InternalServerErrorException If there's an error during login.
+   */
+  async loginUser(loginUserDto: LoginUserDTO): Promise<UserDTO> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { email: loginUserDto.email },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      const passwordMatchResult = await bcrypt.compare(
+        loginUserDto.password,
+        user.password,
+      );
+
+      if (passwordMatchResult) {
+        return new UserDTO(user);
+      } else {
+        throw new InternalServerErrorException('Wrong password');
+      }
+    } catch (error) {
+      console.error('Error during login:', error);
+
+      throw new InternalServerErrorException(
+        'Error during login: ' + error.message,
       );
     }
   }

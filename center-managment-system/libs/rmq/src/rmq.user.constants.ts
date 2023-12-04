@@ -9,4 +9,5 @@ export const USER_MESSAGES = {
   getUser: 'user.get',
   updateUser: 'user.update',
   deleteUser: 'user.delete',
+  userLogin: 'user.login',
 };

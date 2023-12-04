@@ -23,6 +23,8 @@ export class ApiGatewayService {
       dataToSend = { id: number, data: data != null };
     } else if (number && data == null) {
       dataToSend = number;
+    } else if (data) {
+      dataToSend = data;
     }
 
     // Send the message to the user microservice
