@@ -1,1 +1,1 @@
-export * "./rmq.constants"
+export * from './rmq.user.constants';

@@ -22,7 +22,7 @@ export class Center {
   front: Front;
 
   @OneToMany(() => User, (user) => user.center, { cascade: true })
-  tasks: User[];
+  users: User[];
 
   constructor(center: Partial<Center>) {
     Object.assign(this, center);
