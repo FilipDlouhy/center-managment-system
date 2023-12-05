@@ -23,22 +23,34 @@ export class ApiGatewayController {
 
   // Reroute requests to different services based on the request path
   private async rerouteRequest(path: string, data: any) {
+    let response;
     switch (true) {
       // Route to user-related microservice
       case path.startsWith('/user'):
-        const response = await this.apiGatewayService.rerouteToUserService(
+        response = await this.apiGatewayService.rerouteToService(
           path,
           data,
+          'user',
         );
         return response;
 
       // Route to other services or endpoints
       case path.startsWith('/center'):
-        return 'user-service-route';
+        response = await this.apiGatewayService.rerouteToService(
+          path,
+          data,
+          'center',
+        );
+        return response;
       case path.startsWith('/task'):
         return 'user-service-route';
       case path.startsWith('/front'):
-        return 'front';
+        response = await this.apiGatewayService.rerouteToService(
+          path,
+          data,
+          'front',
+        );
+        return response;
       case path.startsWith('/admin/user'):
         return 'user-service-route';
       case path.startsWith('/admin/center'):

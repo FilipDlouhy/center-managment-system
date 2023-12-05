@@ -28,9 +28,6 @@ export class User {
   @OneToMany(() => Task, (task) => task.user, { cascade: true })
   tasks: Task[];
 
-  @ManyToOne(() => Center, (center) => center.users)
-  center: Center;
-
   constructor(user: Partial<User>) {
     Object.assign(this, user);
   }

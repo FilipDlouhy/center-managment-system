@@ -2,7 +2,7 @@ import { Controller } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { USER_MESSAGES } from '@app/rmq';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { UserDTO } from '@app/database/dtos/userDtos/user.dto';
+import { CreateUserDTO } from '@app/database/dtos/userDtos/createUser.dto';
 import { UpdateUserRequestDTO } from '@app/database/dtos/userDtos/updateUserRequest.dto';
 import { LoginUserDTO } from '@app/database/dtos/userDtos/loginUser.dto';
 
@@ -12,7 +12,7 @@ export class UsersController {
 
   // Handle user creation
   @MessagePattern(USER_MESSAGES.createUser)
-  async createUser(@Payload() data: UserDTO) {
+  async createUser(@Payload() data: CreateUserDTO) {
     return this.usersService.createUser(data);
   }
 

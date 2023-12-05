@@ -1,6 +1,6 @@
 import { LoginUserDTO } from '@app/database/dtos/userDtos/loginUser.dto';
 import { UpdateUserRequestDTO } from '@app/database/dtos/userDtos/updateUserRequest.dto';
-import { UserDTO } from '@app/database/dtos/userDtos/user.dto';
+import { CreateUserDTO } from '@app/database/dtos/userDtos/createUser.dto';
 import { User } from '@app/database/entities/user.entity';
 import {
   BadRequestException,
@@ -26,13 +26,13 @@ export class UsersService {
    * @returns The created UserDTO.
    * @throws BadRequestException If the provided data is invalid or email already exists.
    */
-  async createUser(data: UserDTO) {
+  async createUser(data: CreateUserDTO) {
     try {
-      const userDto = new UserDTO(data);
+      const userDto = new CreateUserDTO(data);
       userDto.password = await bcrypt.hash(userDto.password, 10);
       const user = new User(userDto);
       await this.entityManager.save(user);
-      return userDto;
+      return user;
     } catch (error) {
       if (error instanceof QueryFailedError) {
         const errorCode = (error as any).code;
@@ -53,20 +53,18 @@ export class UsersService {
    * @returns An array of UserDTOs.
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
-  async getAllUsers(): Promise<UserDTO[]> {
+  async getAllUsers(): Promise<User[]> {
     try {
-      const users = await this.userRepository.find();
+      const users = await this.userRepository.find({
+        relations: { tasks: true },
+        select: ['id', 'name', 'email', 'admin'],
+      });
 
       if (!users) {
         throw new InternalServerErrorException('No users found');
       }
 
-      const userDtos: UserDTO[] = users.map((user: User) => {
-        const userDto = new UserDTO(user);
-        return userDto;
-      });
-
-      return userDtos;
+      return users;
     } catch (error) {
       console.error('Error while finding users:', error);
 
@@ -81,19 +79,23 @@ export class UsersService {
    * @throws BadRequestException If the ID is invalid.
    * @throws NotFoundException If the user is not found.
    */
-  async getUser(id: number): Promise<UserDTO> {
+  async getUser(id: number): Promise<User> {
     try {
       if (isNaN(id) || id <= 0) {
         throw new BadRequestException('Invalid user ID');
       }
 
-      const user = await this.userRepository.findOne({ where: { id } });
+      const user = await this.userRepository.findOne({
+        where: { id },
+        relations: { tasks: true },
+        select: ['id', 'name', 'email', 'admin'],
+      });
 
       if (!user) {
         throw new NotFoundException('User not found');
       }
 
-      return new UserDTO(user);
+      return user;
     } catch (error) {
       console.error('Error while finding user:', error);
 
@@ -108,9 +110,7 @@ export class UsersService {
    * @throws BadRequestException If the provided ID is invalid.
    * @throws NotFoundException If the user is not found.
    */
-  async updateUser(
-    updateUserDto: UpdateUserRequestDTO,
-  ): Promise<UserDTO | null> {
+  async updateUser(updateUserDto: UpdateUserRequestDTO): Promise<User | null> {
     try {
       if (isNaN(updateUserDto.id) || updateUserDto.id <= 0) {
         throw new BadRequestException('Invalid user ID');
@@ -120,6 +120,7 @@ export class UsersService {
         async (transactionalEntityManager) => {
           const user = await this.userRepository.findOne({
             where: { id: updateUserDto.id },
+            select: ['id', 'name', 'email', 'admin'],
           });
 
           if (!user) {
@@ -142,7 +143,7 @@ export class UsersService {
 
           await transactionalEntityManager.save(user);
 
-          return new UserDTO(user);
+          return user;
         },
       );
 
@@ -188,10 +189,12 @@ export class UsersService {
    * @throws NotFoundException If the user is not found.
    * @throws InternalServerErrorException If there's an error during login.
    */
-  async loginUser(loginUserDto: LoginUserDTO): Promise<UserDTO> {
+  async loginUser(loginUserDto: LoginUserDTO): Promise<User> {
     try {
       const user = await this.userRepository.findOne({
         where: { email: loginUserDto.email },
+        relations: { tasks: true },
+        select: ['id', 'name', 'email', 'admin'],
       });
 
       if (!user) {
@@ -204,7 +207,7 @@ export class UsersService {
       );
 
       if (passwordMatchResult) {
-        return new UserDTO(user);
+        return user;
       } else {
         throw new InternalServerErrorException('Wrong password');
       }

@@ -1,21 +1,37 @@
 import { transformToCamelCase } from '@app/common';
 import { USER_MESSAGES, USER_QUEUE } from '@app/rmq';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CENTER_MESSAGES, CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
+import { FRONT_MESSAGES, FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
+import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 
 @Injectable()
 export class ApiGatewayService {
-  private readonly logger = new Logger(ApiGatewayService.name);
-
   constructor(
     @Inject(USER_QUEUE.serviceName)
     private readonly userClient: ClientProxy,
+    @Inject(CENTER_QUEUE.serviceName)
+    private readonly centerClient: ClientProxy,
+    @Inject(FRONT_QUEUE.serviceName)
+    private readonly frontClient: ClientProxy,
   ) {}
 
   // Route incoming requests to the appropriate user-related microservice operation
-  async rerouteToUserService(path, data) {
-    const { camelCasedString, number } = transformToCamelCase(path.slice(6));
-    const messageType = USER_MESSAGES[camelCasedString];
+  async rerouteToService(path, data, service) {
+    const { camelCasedString, number } = transformToCamelCase(path);
+    let messageType;
+    let client: ClientProxy;
+    if (service === 'user') {
+      client = this.userClient;
+      messageType = USER_MESSAGES[camelCasedString];
+    } else if (service === 'center') {
+      client = this.centerClient;
+      messageType = CENTER_MESSAGES[camelCasedString];
+    } else if (service === 'front') {
+      client = this.frontClient;
+      messageType = FRONT_MESSAGES[camelCasedString];
+    }
+
     let dataToSend = {};
 
     // Prepare data to send based on the request path and payload
@@ -29,12 +45,7 @@ export class ApiGatewayService {
 
     // Send the message to the user microservice
     return dataToSend
-      ? this.userClient.send(messageType, dataToSend).toPromise()
-      : this.userClient.send(messageType, {}).toPromise();
-  }
-
-  // Test method to send a 'test' message to the user microservice
-  async test() {
-    return this.userClient.send('test', {}).toPromise();
+      ? client.send(messageType, dataToSend).toPromise()
+      : client.send(messageType, {}).toPromise();
   }
 }

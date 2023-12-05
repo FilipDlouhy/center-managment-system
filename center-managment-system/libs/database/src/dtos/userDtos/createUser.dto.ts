@@ -1,14 +1,13 @@
 import { generateRandomId } from '@app/common';
 
-export class UserDTO {
+export class CreateUserDTO {
   id: number;
   name: string;
   password: string;
   email: string;
   admin: boolean;
-  centerId: number;
 
-  constructor(user: Partial<UserDTO>) {
+  constructor(user: Partial<CreateUserDTO>) {
     if (
       !user.name ||
       !user.password ||
