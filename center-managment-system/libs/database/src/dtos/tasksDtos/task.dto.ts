@@ -1,4 +1,4 @@
-import { generateRandomId } from "@app/common";
+import { generateRandomId } from '@app/common';
 
 export class TaskDTO {
   id: number;
@@ -6,14 +6,13 @@ export class TaskDTO {
   status: string;
   createdAt: Date;
   processedAt: Date;
+  userId: number;
+  frontId: number;
 
   constructor(task: Partial<TaskDTO>) {
-    if (
-       task.description=== undefined ||
-       task.status === undefined ||
-    ) {
+    if (task.description === undefined || task.status === undefined) {
       throw new Error(
-        'All required properties must be provided with correct types.',
+        'All required properties (description, status) must be provided with correct types.',
       );
     }
 
