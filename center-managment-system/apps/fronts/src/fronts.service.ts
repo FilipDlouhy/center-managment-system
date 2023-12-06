@@ -31,6 +31,8 @@ export class FrontsService {
 
       const frontDto = new FrontDTO(frontData);
       const front = new Front(frontDto);
+      console.log(front);
+
       await this.entityManager.save(front);
 
       return frontDto;
@@ -133,5 +135,19 @@ export class FrontsService {
         'Error while updating front length: ' + error.message,
       );
     }
+  }
+
+  async getFrontForTask() {
+    // Assuming 'frontRepository' is your repository object for the 'Front' entity
+    const sortedFront = await this.frontRepository.find({
+      order: {
+        timeToCompleteAllTasks: 'ASC', // Sort by timeToCompleteAllTasks in ascending order
+        taskTotal: 'ASC', // Then sort by taskTotal in ascending order
+      },
+      take: 1, // Limit the result to only the first entry
+    });
+
+    console.log(sortedFront[0]);
+    return sortedFront[0];
   }
 }

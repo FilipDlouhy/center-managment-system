@@ -16,8 +16,8 @@ export class Task {
   @Column('timestamp')
   createdAt: Date;
 
-  @Column('timestamp')
-  processedAt: Date;
+  @Column()
+  processedAt: number;
 
   @ManyToOne(() => User, (user) => user.tasks)
   user: User;

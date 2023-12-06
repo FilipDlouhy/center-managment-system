@@ -7,11 +7,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Center } from '@app/database/entities/center.entity';
 import { CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
 import { FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
-
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 @Module({
   imports: [
     DatabaseModule,
     TypeOrmModule.forFeature([Center]),
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     ClientsModule.register([
       {
         name: CENTER_QUEUE.serviceName,

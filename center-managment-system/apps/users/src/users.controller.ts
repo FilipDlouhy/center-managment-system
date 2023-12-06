@@ -27,6 +27,11 @@ export class UsersController {
   async getUser(@Payload() userId: number) {
     return this.usersService.getUser(userId);
   }
+  @MessagePattern(USER_MESSAGES.getUserForTask)
+  async getUserForTask(@Payload() userIdObj: { userId: number }) {
+    console.log(userIdObj);
+    return this.usersService.getUser(userIdObj.userId);
+  }
 
   // Handle user information update
   @MessagePattern(USER_MESSAGES.updateUser)

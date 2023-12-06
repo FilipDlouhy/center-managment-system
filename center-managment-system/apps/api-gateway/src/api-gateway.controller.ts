@@ -43,7 +43,13 @@ export class ApiGatewayController {
         );
         return response;
       case path.startsWith('/task'):
-        return 'user-service-route';
+        response = await this.apiGatewayService.rerouteToService(
+          path,
+          data,
+          'task',
+        );
+        return response;
+
       case path.startsWith('/front'):
         response = await this.apiGatewayService.rerouteToService(
           path,

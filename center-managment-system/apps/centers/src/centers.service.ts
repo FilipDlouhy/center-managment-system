@@ -6,22 +6,91 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { ClientProxy } from '@nestjs/microservices';
 import { FRONT_MESSAGES, FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { UpdateCenterDto } from '@app/database/dtos/centerDtos/updateCenter.dto';
-
+import * as amqp from 'amqplib';
+import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 @Injectable()
-export class CentersService {
+export class CentersService implements OnModuleInit {
   constructor(
     @InjectRepository(Center)
     private readonly centerRepository: Repository<Center>,
     private readonly entityManager: EntityManager,
     @Inject(FRONT_QUEUE.serviceName)
-    private readonly frontClient: ClientProxy, // rabbitMq client
+    private readonly frontClient: ClientProxy,
+    private schedulerRegistry: SchedulerRegistry,
   ) {}
+
+  private connection: amqp.Connection;
+  private channel: amqp.Channel;
+  private exchange = 'center_exchange';
+  async onModuleInit() {
+    this.connection = await amqp.connect('amqp://localhost:5672');
+    this.channel = await this.connection.createChannel();
+
+    const centers = await this.getCenters();
+    await this.channel.assertExchange(this.exchange, 'direct', {
+      durable: true,
+    });
+
+    centers.forEach(async (center) => {
+      await this.setupQueueForCenter(center.id.toString());
+    });
+  }
+
+  private async setupQueueForCenter(centerId: string) {
+    const queue = `${centerId}_queue`;
+
+    // Attempt to create the queue
+    try {
+      await this.channel.assertQueue(queue, { durable: true });
+      console.log(`Queue created: ${queue}`);
+
+      // Bind the queue to the exchange
+      await this.channel.bindQueue(
+        queue,
+        this.exchange,
+        `center.${centerId}.task`,
+      );
+      console.log(`Queue bound to exchange: ${queue}`);
+
+      // Start consuming messages from the queue
+      await this.consumeMessagesFromCenter(centerId);
+    } catch (error) {
+      console.error(`Error setting up queue for center ${centerId}:`, error);
+    }
+  }
+
+  private async consumeMessagesFromCenter(centerId: string) {
+    const queue = `${centerId}_queue`;
+
+    await this.channel.consume(queue, (msg) => {
+      if (msg) {
+        const messageContent = JSON.parse(msg.content.toString());
+        console.log(`Received message from ${queue}:`, messageContent);
+
+        // Handle the message (add your message handling logic here)
+
+        this.channel.ack(msg);
+      }
+    });
+  }
+
+  async sendMessageToCenter(centerId: string, messageObject: any) {
+    const queue = `${centerId}_queue`;
+    const message = JSON.stringify(messageObject);
+    await this.channel.publish(
+      this.exchange,
+      `center.${centerId}.task`,
+      Buffer.from(message),
+    );
+    console.log(`Message sent to queue ${queue}`);
+  }
 
   /**
    * Creates a new center.
@@ -41,7 +110,9 @@ export class CentersService {
       });
 
       const center = new Center({ ...centerDto, front });
-      return await this.entityManager.save(center);
+      const savedCenter = await this.entityManager.save(center);
+      this.setupQueueForCenter(savedCenter.id.toString());
+      savedCenter;
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException(
@@ -76,6 +147,15 @@ export class CentersService {
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
   async getCenter(id: number) {
+    await this.sendMessageToCenter((76685736).toString(), {
+      name: 'BONJOURNO',
+      timeToComplete: 5000,
+    });
+    await this.sendMessageToCenter((76685736).toString(), {
+      name: 'BONJOURNO',
+      timeToComplete: 10000,
+    });
+    return;
     try {
       const center = await this.centerRepository.findOne({
         where: { id },

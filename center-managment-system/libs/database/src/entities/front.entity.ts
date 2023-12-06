@@ -9,8 +9,14 @@ export class Front {
   @Column()
   maxTasks: number;
 
+  @Column()
+  taskTotal: number;
+
   @OneToMany(() => Task, (task) => task.front, { cascade: true })
   tasks: Task[];
+
+  @Column()
+  timeToCompleteAllTasks: number;
 
   constructor(front: Partial<Front>) {
     Object.assign(this, front);

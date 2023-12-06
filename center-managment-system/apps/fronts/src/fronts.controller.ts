@@ -32,4 +32,9 @@ export class FrontsController {
   async updateFrontLength(updateLengthDto: UpdateLengthDTO) {
     return this.frontsService.updateMaximumFrontLength(updateLengthDto);
   }
+
+  @MessagePattern(FRONT_MESSAGES.getFrontForTask)
+  async getFrontForTask() {
+    return this.frontsService.getFrontForTask();
+  }
 }

@@ -3,6 +3,8 @@ import { generateRandomId } from '@app/common';
 export class FrontDTO {
   id: number;
   maxTasks: number;
+  taskTotal: number;
+  timeToCompleteAllTasks: number;
 
   constructor(front: Partial<FrontDTO>) {
     if (front.maxTasks === undefined) {
@@ -12,6 +14,8 @@ export class FrontDTO {
     }
 
     this.id = generateRandomId();
+    this.timeToCompleteAllTasks = 0;
+    this.taskTotal = 0;
     Object.assign(this, front);
   }
 }

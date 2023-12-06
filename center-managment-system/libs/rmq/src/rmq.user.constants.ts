@@ -10,4 +10,5 @@ export const USER_MESSAGES = {
   updateUser: 'user.update',
   deleteUser: 'user.delete',
   userLogin: 'user.login',
+  getUserForTask: 'user.getUserForTask',
 };
