@@ -9,4 +9,5 @@ export const CENTER_MESSAGES = {
   getCenter: 'center.get',
   deleteCenter: 'center.delete',
   updateCenter: 'center.update',
+  getCeterWithFrontId: 'center.getCeterWithFrontId',
 };

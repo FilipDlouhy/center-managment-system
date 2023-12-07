@@ -14,10 +14,11 @@ export class CreateTaskDto {
     task: Partial<CreateTaskDto>,
     frontId: number,
     processedAt: number,
+    status: string, // Add the status parameter
   ) {
     this.id = generateRandomId();
     this.description = task.description;
-    this.status = taskStatus.UNSCHEDULED;
+    this.status = status; // Assign the status parameter
     this.userId = task.userId;
     this.frontId = frontId;
 

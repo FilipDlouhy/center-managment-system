@@ -75,7 +75,13 @@ export class CentersService implements OnModuleInit {
         console.log(`Received message from ${queue}:`, messageContent);
 
         // Handle the message (add your message handling logic here)
-
+        const establishWsTimeout = setTimeout(() => {
+          console.log(messageContent);
+        }, 5000);
+        this.schedulerRegistry.addTimeout(
+          `${messageContent.id}_establish_ws`,
+          establishWsTimeout,
+        );
         this.channel.ack(msg);
       }
     });
@@ -265,5 +271,19 @@ export class CentersService implements OnModuleInit {
         'Error while updating center: ' + error.message,
       );
     }
+  }
+
+  async getCenterForTasks(frontIdDto: { frontId: number }) {
+    console.log(frontIdDto);
+    const frontId = frontIdDto.frontId;
+    const center = await this.centerRepository
+      .createQueryBuilder('center')
+      .leftJoinAndSelect('center.front', 'front')
+      .where('front.id = :frontId', { frontId })
+      .select(['center.id']) // Select only the centerId
+      .getRawOne(); // Use getRawOne to get a plain object
+
+    console.log(center);
+    return center;
   }
 }

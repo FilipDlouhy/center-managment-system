@@ -8,6 +8,7 @@ import { DatabaseModule } from '@app/database';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Task } from '@app/database/entities/task.entity';
 import { USER_QUEUE } from '@app/rmq';
+import { CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
 
 @Module({
   imports: [
@@ -42,6 +43,17 @@ import { USER_QUEUE } from '@app/rmq';
         options: {
           urls: [USER_QUEUE.url],
           queue: USER_QUEUE.queueName,
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
+      {
+        name: CENTER_QUEUE.serviceName,
+        transport: Transport.RMQ,
+        options: {
+          urls: [CENTER_QUEUE.url],
+          queue: CENTER_QUEUE.queueName,
           queueOptions: {
             durable: false,
           },

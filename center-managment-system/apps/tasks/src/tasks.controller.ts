@@ -14,13 +14,19 @@ export class TasksController {
   }
 
   @MessagePattern(TASK_MESSAGES.deleteTask)
-  async deleteTask() {}
+  async deleteTask(id: number) {
+    return await this.tasksService.deleteTask(id);
+  }
 
   @MessagePattern(TASK_MESSAGES.getAllTasks)
-  async getAllTasks() {}
+  async getAllTasks() {
+    return await this.tasksService.getAllTasks();
+  }
 
   @MessagePattern(TASK_MESSAGES.getTask)
-  async getTask() {}
+  async getTask(id: number) {
+    return await this.tasksService.getTask(id);
+  }
 
   @MessagePattern(TASK_MESSAGES.updateTask)
   async updateTask() {}

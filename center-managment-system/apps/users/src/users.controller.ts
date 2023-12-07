@@ -29,7 +29,6 @@ export class UsersController {
   }
   @MessagePattern(USER_MESSAGES.getUserForTask)
   async getUserForTask(@Payload() userIdObj: { userId: number }) {
-    console.log(userIdObj);
     return this.usersService.getUser(userIdObj.userId);
   }
 

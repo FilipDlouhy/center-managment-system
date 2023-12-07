@@ -1,4 +1,5 @@
 import { FrontDTO } from '@app/database/dtos/frontDtos/front.dto';
+import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUpdateTimeAndTasks.dto';
 import { UpdateLengthDTO } from '@app/database/dtos/frontDtos/updateLength.dto';
 import { Front } from '@app/database/entities/front.entity';
 import { frontLength } from '@app/database/front.length.constant';
@@ -7,6 +8,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { Payload } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 
@@ -144,10 +146,49 @@ export class FrontsService {
         timeToCompleteAllTasks: 'ASC', // Sort by timeToCompleteAllTasks in ascending order
         taskTotal: 'ASC', // Then sort by taskTotal in ascending order
       },
-      take: 1, // Limit the result to only the first entry
+      take: 1,
     });
 
-    console.log(sortedFront[0]);
     return sortedFront[0];
+  }
+
+  async updateFrontTasksLengthInFront(
+    frontUpdateObj: FrontUpdateTimeAndTasksDTO,
+  ) {
+    console.log(frontUpdateObj.frontId);
+
+    const updatedFront = await this.entityManager.transaction(
+      async (transactionalEntityManager) => {
+        const front = await this.frontRepository.findOne({
+          where: { id: frontUpdateObj.frontId },
+          select: ['id', 'timeToCompleteAllTasks', 'taskTotal', 'maxTasks'],
+        });
+
+        if (!front) {
+          throw new NotFoundException('Front not found');
+        }
+
+        if (front.taskTotal + 1 > front.maxTasks) {
+          throw new NotFoundException('Front full');
+        }
+        front.taskTotal = front.taskTotal + 1;
+        front.timeToCompleteAllTasks =
+          front.timeToCompleteAllTasks + frontUpdateObj.timeToCompleteTask;
+
+        await transactionalEntityManager.save(front);
+
+        return front;
+      },
+    );
+
+    console.log(updatedFront);
+    return true;
+  }
+  catch(error) {
+    console.error('Error while updating user:', error);
+
+    throw new InternalServerErrorException(
+      'Error while updating user: ' + error.message,
+    );
   }
 }

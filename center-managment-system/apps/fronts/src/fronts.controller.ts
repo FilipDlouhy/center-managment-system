@@ -1,8 +1,9 @@
 import { Controller } from '@nestjs/common';
 import { FrontsService } from './fronts.service';
-import { MessagePattern } from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { FRONT_MESSAGES } from '@app/rmq/rmq.front.constants';
 import { UpdateLengthDTO } from '@app/database/dtos/frontDtos/updateLength.dto';
+import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUpdateTimeAndTasks.dto';
 
 @Controller()
 export class FrontsController {
@@ -36,5 +37,12 @@ export class FrontsController {
   @MessagePattern(FRONT_MESSAGES.getFrontForTask)
   async getFrontForTask() {
     return this.frontsService.getFrontForTask();
+  }
+
+  @MessagePattern(FRONT_MESSAGES.updateFrontTasksLength)
+  async updateFrontTasksLengthInFront(
+    @Payload() frontUpdateObj: FrontUpdateTimeAndTasksDTO,
+  ) {
+    return this.frontsService.updateFrontTasksLengthInFront(frontUpdateObj);
   }
 }

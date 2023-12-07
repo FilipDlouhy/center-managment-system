@@ -9,6 +9,7 @@ import { CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
 import { FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { TASK_QUEUE } from '@app/rmq/rmq.task.constants';
 @Module({
   imports: [
     DatabaseModule,
@@ -34,6 +35,17 @@ import { ScheduleModule } from '@nestjs/schedule';
         options: {
           urls: [FRONT_QUEUE.url],
           queue: FRONT_QUEUE.queueName,
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
+      {
+        name: TASK_QUEUE.serviceName,
+        transport: Transport.RMQ,
+        options: {
+          urls: [TASK_QUEUE.url],
+          queue: TASK_QUEUE.queueName,
           queueOptions: {
             durable: false,
           },

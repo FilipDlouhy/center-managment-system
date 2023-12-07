@@ -56,7 +56,6 @@ export class UsersService {
   async getAllUsers(): Promise<User[]> {
     try {
       const users = await this.userRepository.find({
-        relations: { tasks: true },
         select: ['id', 'name', 'email', 'admin'],
       });
 

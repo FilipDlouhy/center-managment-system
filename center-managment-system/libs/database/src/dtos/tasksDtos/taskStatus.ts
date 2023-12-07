@@ -3,5 +3,4 @@ export const taskStatus = {
   SCHEDULED: 'scheduled',
   DOING: 'doing',
   DONE: 'done',
-  DELETED: 'deleted',
 };

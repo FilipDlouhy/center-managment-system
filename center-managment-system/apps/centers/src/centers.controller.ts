@@ -31,4 +31,9 @@ export class CentersController {
   async updateCenter(@Payload() UpdateCenterDto: UpdateCenterDto) {
     return this.centersService.updateCenter(UpdateCenterDto);
   }
+
+  @MessagePattern(CENTER_MESSAGES.getCeterWithFrontId)
+  async getCenterForTask(@Payload() frontIdDto: { frontId: number }) {
+    return this.centersService.getCenterForTasks(frontIdDto);
+  }
 }
