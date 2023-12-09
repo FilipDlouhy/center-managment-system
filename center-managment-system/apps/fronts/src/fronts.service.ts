@@ -1,14 +1,18 @@
 import { FrontDTO } from '@app/database/dtos/frontDtos/front.dto';
 import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUpdateTimeAndTasks.dto';
 import { UpdateLengthDTO } from '@app/database/dtos/frontDtos/updateLength.dto';
+import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { Front } from '@app/database/entities/front.entity';
 import { frontLength } from '@app/database/front.length.constant';
+import { TASK_QUEUE } from '@app/rmq/rmq.task.constants';
 import {
+  BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Payload } from '@nestjs/microservices';
+import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 
@@ -18,6 +22,8 @@ export class FrontsService {
     @InjectRepository(Front)
     private readonly frontRepository: Repository<Front>,
     private readonly entityManager: EntityManager,
+    @Inject(TASK_QUEUE.serviceName)
+    private readonly taskClient: ClientProxy,
   ) {}
 
   /**
@@ -75,7 +81,6 @@ export class FrontsService {
     try {
       const front = await this.frontRepository.findOne({
         where: { id },
-        relations: ['front', 'front.tasks'],
       });
 
       if (!front) {
@@ -115,6 +120,13 @@ export class FrontsService {
     }
   }
 
+  /**
+   * Updates the maximum length of tasks for a front.
+   * @param updateLengthDto Data Transfer Object containing the new maximum length.
+   * @returns Boolean indicating success of the operation.
+   * @throws NotFoundException If the front table is not found.
+   * @throws InternalServerErrorException For any other unexpected errors.
+   */
   async updateMaximumFrontLength(
     updateLengthDto: UpdateLengthDTO,
   ): Promise<boolean> {
@@ -139,6 +151,10 @@ export class FrontsService {
     }
   }
 
+  /**
+   * Retrieves the best front for assigning a task.
+   * @returns The best suited front.
+   */
   async getFrontForTask() {
     // Assuming 'frontRepository' is your repository object for the 'Front' entity
     const sortedFront = await this.frontRepository.find({
@@ -152,43 +168,164 @@ export class FrontsService {
     return sortedFront[0];
   }
 
-  async updateFrontTasksLengthInFront(
-    frontUpdateObj: FrontUpdateTimeAndTasksDTO,
-  ) {
-    console.log(frontUpdateObj.frontId);
+  /**
+   * Adds a task to a front and updates its total task count and time to complete.
+   * @param frontUpdateObj Data Transfer Object for updating front.
+   * @returns Boolean indicating success of the operation.
+   * @throws BadRequestException If input data is invalid.
+   * @throws NotFoundException If the front is not found.
+   * @throws InternalServerErrorException For any other unexpected errors.
+   */
+  async addTaskToFront(frontUpdateObj: FrontUpdateTimeAndTasksDTO) {
+    // Validate input
+    if (
+      !frontUpdateObj ||
+      !frontUpdateObj.frontId ||
+      frontUpdateObj.timeToCompleteTask == null
+    ) {
+      throw new BadRequestException('Invalid input data');
+    }
 
-    const updatedFront = await this.entityManager.transaction(
-      async (transactionalEntityManager) => {
-        const front = await this.frontRepository.findOne({
-          where: { id: frontUpdateObj.frontId },
-          select: ['id', 'timeToCompleteAllTasks', 'taskTotal', 'maxTasks'],
-        });
+    console.log(`Updating front with ID ${frontUpdateObj.frontId}`);
 
-        if (!front) {
-          throw new NotFoundException('Front not found');
-        }
+    try {
+      const updatedFront = await this.entityManager.transaction(
+        async (transactionalEntityManager) => {
+          const front = await this.frontRepository.findOne({
+            where: { id: frontUpdateObj.frontId },
+            select: ['id', 'timeToCompleteAllTasks', 'taskTotal', 'maxTasks'],
+          });
 
-        if (front.taskTotal + 1 > front.maxTasks) {
-          throw new NotFoundException('Front full');
-        }
-        front.taskTotal = front.taskTotal + 1;
-        front.timeToCompleteAllTasks =
-          front.timeToCompleteAllTasks + frontUpdateObj.timeToCompleteTask;
+          if (!front) {
+            throw new NotFoundException('Front not found');
+          }
 
-        await transactionalEntityManager.save(front);
+          if (front.taskTotal + 1 > front.maxTasks) {
+            throw new BadRequestException('Front full');
+          }
 
-        return front;
-      },
-    );
+          front.taskTotal = front.taskTotal + 1;
+          front.timeToCompleteAllTasks =
+            front.timeToCompleteAllTasks + frontUpdateObj.timeToCompleteTask;
 
-    console.log(updatedFront);
-    return true;
+          await transactionalEntityManager.save(front);
+
+          return true;
+        },
+      );
+
+      return updatedFront;
+    } catch (error) {
+      console.error('Error while updating front:', error);
+      throw new InternalServerErrorException(
+        'Error while updating front: ' + error.message,
+      );
+    }
   }
-  catch(error) {
-    console.error('Error while updating user:', error);
 
-    throw new InternalServerErrorException(
-      'Error while updating user: ' + error.message,
-    );
+  /**
+   * Deletes a task from a front and updates its total task count and time to complete.
+   * @param frontLengthUpdateDto Data Transfer Object for updating front task length.
+   * @returns Boolean indicating success of the operation.
+   * @throws BadRequestException If input data is invalid.
+   * @throws NotFoundException If the front is not found.
+   * @throws InternalServerErrorException For any other unexpected errors.
+   */
+  async deleteFrontTaskLength(
+    frontLengthUpdateDto: FrontUpdateTimeAndTasksDTO,
+  ) {
+    // Validate input
+    if (
+      !frontLengthUpdateDto ||
+      !frontLengthUpdateDto.frontId ||
+      frontLengthUpdateDto.timeToCompleteTask == null
+    ) {
+      throw new BadRequestException('Invalid input data');
+    }
+
+    try {
+      const updatedFront = await this.entityManager.transaction(
+        async (transactionalEntityManager) => {
+          const front = await this.frontRepository.findOne({
+            where: { id: frontLengthUpdateDto.frontId },
+          });
+
+          if (!front) {
+            throw new NotFoundException('Front not found');
+          }
+
+          // Check for negative values
+          if (
+            front.timeToCompleteAllTasks <
+              frontLengthUpdateDto.timeToCompleteTask ||
+            front.taskTotal <= 0
+          ) {
+            throw new BadRequestException('Invalid task length or task count');
+          }
+
+          front.timeToCompleteAllTasks =
+            front.timeToCompleteAllTasks -
+            frontLengthUpdateDto.timeToCompleteTask;
+          front.taskTotal = front.taskTotal - 1;
+          await transactionalEntityManager.save(front);
+
+          return true;
+        },
+      );
+      return updatedFront;
+    } catch (error) {
+      console.error('Error while updating front task length:', error);
+      throw new InternalServerErrorException(
+        'Error while updating front task length: ' + error.message,
+      );
+    }
+  }
+
+  /**
+   * Adds the best task to a front based on specific criteria.
+   * @param frontUpdateTaskDto Data Transfer Object for updating front with the best task.
+   * @returns Boolean indicating success of the operation.
+   * @throws BadRequestException If input data is invalid.
+   * @throws NotFoundException If the front is not found.
+   * @throws InternalServerErrorException For any other unexpected errors.
+   */
+  async addBestTaskToFront(frontUpdateTaskDto: AddTaskToFrontDTO) {
+    // Validate input
+    if (
+      !frontUpdateTaskDto ||
+      !frontUpdateTaskDto.frontId ||
+      frontUpdateTaskDto.processedAt == null
+    ) {
+      throw new BadRequestException('Invalid input data');
+    }
+
+    try {
+      const updatedFront = await this.entityManager.transaction(
+        async (transactionalEntityManager) => {
+          const front = await this.frontRepository.findOne({
+            where: { id: frontUpdateTaskDto.frontId },
+          });
+
+          if (!front) {
+            throw new NotFoundException('Front not found');
+          }
+
+          // Update front's task total and time to complete all tasks
+          front.taskTotal = front.taskTotal + 1;
+          front.timeToCompleteAllTasks =
+            front.timeToCompleteAllTasks + frontUpdateTaskDto.processedAt;
+
+          await transactionalEntityManager.save(front);
+
+          return true;
+        },
+      );
+      return updatedFront;
+    } catch (error) {
+      console.error('Error in addBestTaskToFront:', error);
+      throw new InternalServerErrorException(
+        'Error occurred in addBestTaskToFront: ' + error.message,
+      );
+    }
   }
 }

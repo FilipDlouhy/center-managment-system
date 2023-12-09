@@ -1,5 +1,4 @@
 import { generateRandomId } from '@app/common';
-import { taskStatus } from './taskStatus';
 
 export class CreateTaskDto {
   id: number;

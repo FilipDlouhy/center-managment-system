@@ -9,6 +9,8 @@ export const FRONT_MESSAGES = {
   getFront: 'front.get',
   deleteFront: 'front.delete',
   updateFrontLength: 'front.updateLength',
-  updateFrontTasksLength: 'front.updateTaskLength',
+  addFrontTasksLength: 'front.addTaskLength',
   getFrontForTask: 'front.getFrontForTask',
+  deleteFrontTaskLength: 'front.deleteFrontTaskLength',
+  addBestTaskToFront: 'front.addBestTaskToFront',
 };

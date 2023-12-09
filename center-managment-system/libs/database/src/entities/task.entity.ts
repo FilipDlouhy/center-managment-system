@@ -16,14 +16,17 @@ export class Task {
   @Column('timestamp')
   createdAt: Date;
 
+  @Column('timestamp', { nullable: true })
+  whenAddedToTheFront: Date | null;
+
   @Column()
   processedAt: number;
 
   @ManyToOne(() => User, (user) => user.tasks)
   user: User;
 
-  @ManyToOne(() => Front, (front) => front.tasks)
-  front: Front;
+  @ManyToOne(() => Front, (front) => front.tasks, { nullable: true })
+  front: Front | null;
 
   constructor(task: Partial<Task>) {
     Object.assign(this, task);

@@ -14,7 +14,12 @@ import { ClientProxy } from '@nestjs/microservices';
 import { FRONT_MESSAGES, FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { UpdateCenterDto } from '@app/database/dtos/centerDtos/updateCenter.dto';
 import * as amqp from 'amqplib';
-import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { TASK_MESSAGES, TASK_QUEUE } from '@app/rmq/rmq.task.constants';
+import { UpdateTaskStateDTO } from '@app/database/dtos/tasksDtos/updateTaskState.dto';
+import { taskStatus } from '@app/database/dtos/tasksDtos/taskStatus';
+import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
+import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUpdateTimeAndTasks.dto';
 @Injectable()
 export class CentersService implements OnModuleInit {
   constructor(
@@ -23,6 +28,8 @@ export class CentersService implements OnModuleInit {
     private readonly entityManager: EntityManager,
     @Inject(FRONT_QUEUE.serviceName)
     private readonly frontClient: ClientProxy,
+    @Inject(TASK_QUEUE.serviceName)
+    private readonly taskClient: ClientProxy,
     private schedulerRegistry: SchedulerRegistry,
   ) {}
 
@@ -43,6 +50,10 @@ export class CentersService implements OnModuleInit {
     });
   }
 
+  /**
+   * Consumes messages from a center queue and processes them.
+   * @param centerId The ID of the center whose queue is being consumed.
+   */
   private async setupQueueForCenter(centerId: string) {
     const queue = `${centerId}_queue`;
 
@@ -67,23 +78,82 @@ export class CentersService implements OnModuleInit {
   }
 
   private async consumeMessagesFromCenter(centerId: string) {
-    const queue = `${centerId}_queue`;
+    const queueName = `${centerId}_queue`;
 
-    await this.channel.consume(queue, (msg) => {
-      if (msg) {
-        const messageContent = JSON.parse(msg.content.toString());
-        console.log(`Received message from ${queue}:`, messageContent);
-
-        // Handle the message (add your message handling logic here)
-        const establishWsTimeout = setTimeout(() => {
-          console.log(messageContent);
-        }, 5000);
-        this.schedulerRegistry.addTimeout(
-          `${messageContent.id}_establish_ws`,
-          establishWsTimeout,
-        );
-        this.channel.ack(msg);
+    // Start consuming messages from the queue
+    await this.channel.consume(queueName, async (msg) => {
+      // Check if a message is received
+      if (!msg) {
+        console.warn(`No message received from ${queueName}`);
+        return;
       }
+
+      // Parse the message content from the queue
+      const messageContent = JSON.parse(msg.content.toString());
+      console.log(`Received message from ${queueName}:`, messageContent);
+
+      // Process the message after a delay based on 'processedAt' time
+      const establishWsTimeout = setTimeout(async () => {
+        try {
+          // Update task state to DONE using the data received in the message
+          const taskUpdateDto = new UpdateTaskStateDTO(
+            messageContent.id,
+            taskStatus.DONE,
+            messageContent.frontId,
+          );
+          await this.taskClient
+            .send(TASK_MESSAGES.updateTaskState, taskUpdateDto)
+            .toPromise();
+
+          // Update the length of tasks in the front specified in the message
+          const frontUpdateDto = new FrontUpdateTimeAndTasksDTO(
+            messageContent.frontId,
+            messageContent.processedAt,
+          );
+          await this.frontClient
+            .send(FRONT_MESSAGES.deleteFrontTaskLength, frontUpdateDto)
+            .toPromise();
+
+          // Handle selecting the best task for the front
+          const bestTaskForFront = await this.taskClient
+            .send(TASK_MESSAGES.getBestTaskForFront, {})
+            .toPromise();
+
+          // If a best task is found, schedule it for the front
+          if (bestTaskForFront != null) {
+            const taskToFrontDto = new AddTaskToFrontDTO(
+              bestTaskForFront.id,
+              taskStatus.SCHEDULED,
+              bestTaskForFront.processedAt,
+              messageContent.frontId,
+            );
+            await this.frontClient
+              .send(FRONT_MESSAGES.addBestTaskToFront, taskToFrontDto)
+              .toPromise();
+            await this.taskClient
+              .send(TASK_MESSAGES.addFrontToTask, taskToFrontDto)
+              .toPromise();
+          }
+
+          // Find the next task to do in the specified front
+          await this.taskClient
+            .send(TASK_MESSAGES.findNextTaskToDoInFront, {
+              frontId: messageContent.frontId,
+            })
+            .toPromise();
+        } catch (error) {
+          console.error('Error processing message from center:', error);
+        }
+      }, messageContent.processedAt);
+
+      // Add the task processing to the scheduler registry
+      this.schedulerRegistry.addTimeout(
+        `${messageContent.id}_establish_ws`,
+        establishWsTimeout,
+      );
+
+      // Acknowledge the message so it is not sent again
+      this.channel.ack(msg);
     });
   }
 
@@ -118,7 +188,7 @@ export class CentersService implements OnModuleInit {
       const center = new Center({ ...centerDto, front });
       const savedCenter = await this.entityManager.save(center);
       this.setupQueueForCenter(savedCenter.id.toString());
-      savedCenter;
+      return savedCenter;
     } catch (error) {
       console.error(error);
       throw new InternalServerErrorException(
@@ -153,15 +223,6 @@ export class CentersService implements OnModuleInit {
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
   async getCenter(id: number) {
-    await this.sendMessageToCenter((76685736).toString(), {
-      name: 'BONJOURNO',
-      timeToComplete: 5000,
-    });
-    await this.sendMessageToCenter((76685736).toString(), {
-      name: 'BONJOURNO',
-      timeToComplete: 10000,
-    });
-    return;
     try {
       const center = await this.centerRepository.findOne({
         where: { id },
@@ -273,8 +334,12 @@ export class CentersService implements OnModuleInit {
     }
   }
 
+  /**
+   * Retrieves the center for tasks associated with a specific front.
+   * @param frontIdDto DTO containing the front ID.
+   * @returns The center associated with the given front ID.
+   */
   async getCenterForTasks(frontIdDto: { frontId: number }) {
-    console.log(frontIdDto);
     const frontId = frontIdDto.frontId;
     const center = await this.centerRepository
       .createQueryBuilder('center')
@@ -283,7 +348,6 @@ export class CentersService implements OnModuleInit {
       .select(['center.id']) // Select only the centerId
       .getRawOne(); // Use getRawOne to get a plain object
 
-    console.log(center);
     return center;
   }
 }

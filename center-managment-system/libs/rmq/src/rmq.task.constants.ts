@@ -7,6 +7,9 @@ export const TASK_MESSAGES = {
   createTask: 'task.created',
   getAllTasks: 'tasks.getAll',
   getTask: 'task.get',
-  updateTask: 'task.update',
+  updateTaskState: 'task.updateState',
   deleteTask: 'task.delete',
+  getBestTaskForFront: 'task.getBestTaskForFront',
+  findNextTaskToDoInFront: 'task.findNextTaskToDoInFront',
+  addFrontToTask: 'task.addFrontToTask',
 };
