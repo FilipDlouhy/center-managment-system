@@ -131,7 +131,6 @@ export class TasksService implements OnModuleInit {
           const { center_id } = await this.centerClient
             .send(CENTER_MESSAGES.getCeterWithFrontId, { frontId: front.id })
             .toPromise();
-          console.log(center_id);
 
           this.sendMessageToCenter(center_id, newTaskDto);
         }
@@ -218,7 +217,6 @@ export class TasksService implements OnModuleInit {
       );
 
       dtoTest.userId = task.user.id;
-      console.log(dtoTest);
       if (!task) {
         throw new NotFoundException('User not found');
       }
@@ -395,8 +393,6 @@ export class TasksService implements OnModuleInit {
         },
       });
 
-      console.log('findNextTaskToDoInFront - Task Retrieved:', updatedTask);
-
       if (!updatedTask) {
         console.log(`No scheduled task found for front ID: ${frontId}`);
         return null;
@@ -423,7 +419,6 @@ export class TasksService implements OnModuleInit {
       await this.sendMessageToCenter(center_id, newTaskToDo);
       await this.taskRepository.save(updatedTask);
 
-      console.log('Task updated and sent to center:', updatedTask);
       return updatedTask;
     } catch (error) {
       console.error('Error in findNextTaskToDoInFront:', error);

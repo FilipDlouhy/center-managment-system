@@ -6,6 +6,8 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { TASK_QUEUE } from '@app/rmq/rmq.task.constants';
 import { FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
+import { CacheInterceptor, CacheModule } from '@nestjs/cache-manager';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -55,8 +57,12 @@ import { CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
         },
       },
     ]),
+    CacheModule.register({ ttl: 3600 * 3 }),
   ],
   controllers: [ApiGatewayController],
-  providers: [ApiGatewayService],
+  providers: [
+    ApiGatewayService,
+    { provide: APP_INTERCEPTOR, useClass: CacheInterceptor },
+  ],
 })
 export class ApiGatewayModule {}

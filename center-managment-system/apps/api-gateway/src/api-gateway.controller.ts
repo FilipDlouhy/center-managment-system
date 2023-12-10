@@ -46,7 +46,7 @@ export class ApiGatewayController {
         response = await this.apiGatewayService.rerouteToService(
           path,
           data,
-          'task',
+          'center',
         );
         return response;
 
@@ -57,14 +57,6 @@ export class ApiGatewayController {
           'front',
         );
         return response;
-      case path.startsWith('/admin/user'):
-        return 'user-service-route';
-      case path.startsWith('/admin/center'):
-        return 'user-service-route';
-      case path.startsWith('/admin/task'):
-        return 'user-service-route';
-      case path.startsWith('/admin/front'):
-        return 'front';
     }
   }
 }

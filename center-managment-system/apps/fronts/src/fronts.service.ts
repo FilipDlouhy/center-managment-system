@@ -39,8 +39,6 @@ export class FrontsService {
 
       const frontDto = new FrontDTO(frontData);
       const front = new Front(frontDto);
-      console.log(front);
-
       await this.entityManager.save(front);
 
       return frontDto;

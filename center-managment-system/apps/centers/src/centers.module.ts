@@ -10,6 +10,7 @@ import { FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TASK_QUEUE } from '@app/rmq/rmq.task.constants';
+
 @Module({
   imports: [
     DatabaseModule,
