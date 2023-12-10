@@ -3,7 +3,7 @@ import { USER_MESSAGES, USER_QUEUE } from '@app/rmq';
 import { CENTER_MESSAGES, CENTER_QUEUE } from '@app/rmq/rmq.center.constants';
 import { FRONT_MESSAGES, FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { TASK_MESSAGES, TASK_QUEUE } from '@app/rmq/rmq.task.constants';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 
 @Injectable()
@@ -50,8 +50,13 @@ export class ApiGatewayService {
     }
     // Send the message to the user microservice
 
-    return dataToSend
-      ? client.send(messageType, dataToSend).toPromise()
-      : client.send(messageType, {}).toPromise();
+    try {
+      return dataToSend
+        ? await client.send(messageType, dataToSend).toPromise()
+        : await client.send(messageType, {}).toPromise();
+    } catch (error) {
+      console.error('Error received from microservice:', error);
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 }

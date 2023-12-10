@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { FrontsService } from './fronts.service';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
 import { FRONT_MESSAGES } from '@app/rmq/rmq.front.constants';
 import { UpdateLengthDTO } from '@app/database/dtos/frontDtos/updateLength.dto';
 import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUpdateTimeAndTasks.dto';
@@ -15,37 +15,61 @@ export class FrontsController {
   // Create a new front
   @MessagePattern(FRONT_MESSAGES.frontCreate)
   async createFront(): Promise<FrontDTO> {
-    return await this.frontsService.createFront();
+    try {
+      return await this.frontsService.createFront();
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Get a list of all fronts
   @MessagePattern(FRONT_MESSAGES.getAllFronts)
   async getAllFronts(): Promise<Front[]> {
-    return await this.frontsService.getFronts();
+    try {
+      return await this.frontsService.getFronts();
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Get a front by its ID
   @MessagePattern(FRONT_MESSAGES.getFront)
   async getFront(id: number): Promise<Front> {
-    return await this.frontsService.getFront(id);
+    try {
+      return await this.frontsService.getFront(id);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Delete a front by its ID
   @MessagePattern(FRONT_MESSAGES.deleteFront)
   async deleteFront(id: number): Promise<boolean> {
-    return await this.frontsService.deleteFront(id);
+    try {
+      return await this.frontsService.deleteFront(id);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Update the length of a front
   @MessagePattern(FRONT_MESSAGES.updateFrontLength)
   async updateFrontLength(updateLengthDto: UpdateLengthDTO): Promise<boolean> {
-    return await this.frontsService.updateMaximumFrontLength(updateLengthDto);
+    try {
+      return await this.frontsService.updateMaximumFrontLength(updateLengthDto);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Get a front for a task
   @MessagePattern(FRONT_MESSAGES.getFrontForTask)
   async getFrontForTask(): Promise<Front> {
-    return await this.frontsService.getFrontForTask();
+    try {
+      return await this.frontsService.getFrontForTask();
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Add a task's length to a front
@@ -53,7 +77,11 @@ export class FrontsController {
   async addTaskToFront(
     @Payload() frontUpdateObj: FrontUpdateTimeAndTasksDTO,
   ): Promise<boolean> {
-    return await this.frontsService.addTaskToFront(frontUpdateObj);
+    try {
+      return await this.frontsService.addTaskToFront(frontUpdateObj);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Delete a task's length from a front
@@ -61,7 +89,11 @@ export class FrontsController {
   async deleteFrontTaskLength(
     @Payload() frontUpdateObj: FrontUpdateTimeAndTasksDTO,
   ): Promise<boolean> {
-    return await this.frontsService.deleteFrontTaskLength(frontUpdateObj);
+    try {
+      return await this.frontsService.deleteFrontTaskLength(frontUpdateObj);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Add the best task to a front
@@ -69,6 +101,10 @@ export class FrontsController {
   async addBestTaskToFront(
     @Payload() frontUpdateTask: AddTaskToFrontDTO,
   ): Promise<boolean> {
-    return await this.frontsService.addBestTaskToFront(frontUpdateTask);
+    try {
+      return await this.frontsService.addBestTaskToFront(frontUpdateTask);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 }

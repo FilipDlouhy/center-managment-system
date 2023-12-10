@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { TASK_MESSAGES } from '@app/rmq/rmq.task.constants';
-import { MessagePattern } from '@nestjs/microservices';
+import { MessagePattern, RpcException } from '@nestjs/microservices';
 import { CreateTaskDto } from '@app/database/dtos/tasksDtos/createTask.dto';
 import { UpdateTaskStateDTO } from '@app/database/dtos/tasksDtos/updateTaskState.dto';
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
@@ -14,25 +14,41 @@ export class TasksController {
   // Create a new task
   @MessagePattern(TASK_MESSAGES.createTask)
   async createTask(data: CreateTaskDto): Promise<Task> {
-    return await this.tasksService.createTask(data);
+    try {
+      return await this.tasksService.createTask(data);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Delete a task by its ID
   @MessagePattern(TASK_MESSAGES.deleteTask)
   async deleteTask(id: number): Promise<boolean> {
-    return await this.tasksService.deleteTask(id);
+    try {
+      return await this.tasksService.deleteTask(id);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Get a list of all tasks
   @MessagePattern(TASK_MESSAGES.getAllTasks)
   async getAllTasks(): Promise<Task[]> {
-    return await this.tasksService.getAllTasks();
+    try {
+      return await this.tasksService.getAllTasks();
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Get a task by its ID
   @MessagePattern(TASK_MESSAGES.getTask)
   async getTask(id: number): Promise<Task> {
-    return await this.tasksService.getTask(id);
+    try {
+      return await this.tasksService.getTask(id);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Update the state of a task
@@ -40,13 +56,21 @@ export class TasksController {
   async updateTaskState(
     updateTaskStateStateDto: UpdateTaskStateDTO,
   ): Promise<boolean> {
-    return await this.tasksService.updateTaskState(updateTaskStateStateDto);
+    try {
+      return await this.tasksService.updateTaskState(updateTaskStateStateDto);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Get the best task for a front-end
   @MessagePattern(TASK_MESSAGES.getBestTaskForFront)
   async getBestTaskForFront(): Promise<Task | null> {
-    return await this.tasksService.getBestTaskForFront();
+    try {
+      return await this.tasksService.getBestTaskForFront();
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Find the next task to do in a specific front-end
@@ -54,7 +78,13 @@ export class TasksController {
   async findNextTaskToDoInFront(frontIdObj: {
     frontId: number;
   }): Promise<Task | null> {
-    return await this.tasksService.findNextTaskToDoInFront(frontIdObj.frontId);
+    try {
+      return await this.tasksService.findNextTaskToDoInFront(
+        frontIdObj.frontId,
+      );
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Add a front-end to a task
@@ -62,7 +92,11 @@ export class TasksController {
   async addFrontToTask(
     taskToaddToTheFront: AddTaskToFrontDTO,
   ): Promise<boolean> {
-    return await this.tasksService.addFrontToTask(taskToaddToTheFront);
+    try {
+      return await this.tasksService.addFrontToTask(taskToaddToTheFront);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Delete front from tasks
@@ -72,7 +106,11 @@ export class TasksController {
   }: {
     frontId: number;
   }): Promise<boolean> {
-    return await this.tasksService.deleteFrontFromTasks(frontId);
+    try {
+      return await this.tasksService.deleteFrontFromTasks(frontId);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Delete front from tasks
@@ -82,7 +120,11 @@ export class TasksController {
   }: {
     userId: number;
   }): Promise<boolean> {
-    return await this.tasksService.deleteTasksWithoutUser(userId);
+    try {
+      return await this.tasksService.deleteTasksWithoutUser(userId);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 
   // Delete front from tasks
@@ -94,6 +136,13 @@ export class TasksController {
     centerId: number;
     frontId: number;
   }): Promise<void> {
-    return await this.tasksService.sendTaskToDoAfterRestart(centerId, frontId);
+    try {
+      return await this.tasksService.sendTaskToDoAfterRestart(
+        centerId,
+        frontId,
+      );
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
   }
 }

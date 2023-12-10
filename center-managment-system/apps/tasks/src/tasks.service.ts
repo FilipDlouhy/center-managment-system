@@ -52,79 +52,107 @@ export class TasksService implements OnModuleInit {
    * @throws InternalServerErrorException For any other unexpected errors.
    */
   async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
-    // Retrieve the Front object using the client proxy
-    const timeToCompleteTask = this.generateRandomTime(3);
+    try {
+      // Generate random time for task completion
+      const timeToCompleteTask = this.generateRandomTime(3);
 
-    const front: Front = await this.frontClient
-      .send(FRONT_MESSAGES.getFrontForTask, {})
-      .toPromise();
-
-    if (!front) {
-      throw new Error('Front not found');
-    }
-
-    if (front.taskTotal + 1 > front.maxTasks) {
-      const newTaskDto = new CreateTaskDto(
-        createTaskDto,
-        null,
-        timeToCompleteTask,
-        taskStatus.UNSCHEDULED,
-      );
-      const user: User = await this.userClient
-        .send(USER_MESSAGES.getUserForTask, { userId: createTaskDto.userId })
-        .toPromise();
-      const newTask = this.taskRepository.create({
-        ...newTaskDto,
-        user,
-        whenAddedToTheFront: null,
-      });
-
-      const savedTask = await this.taskRepository.save(newTask);
-
-      return savedTask;
-    } else {
-      const updateFrontTaskLengthAndTimeDto: FrontUpdateTimeAndTasksDTO =
-        new FrontUpdateTimeAndTasksDTO(front.id, timeToCompleteTask);
-
-      const wasFrontUpdated: boolean = await this.frontClient
-        .send(
-          FRONT_MESSAGES.addFrontTasksLength,
-          updateFrontTaskLengthAndTimeDto,
-        )
-        .toPromise();
-
-      if (wasFrontUpdated) {
-        const user: User = await this.userClient
+      // Retrieve User
+      let user: User;
+      try {
+        user = await this.userClient
           .send(USER_MESSAGES.getUserForTask, { userId: createTaskDto.userId })
           .toPromise();
+      } catch (error) {
+        throw new Error('Error retrieving user');
+      }
 
-        // Save the new Task entity
+      if (user.tasks.length >= 5) {
+        throw new Error('User has too many tasks');
+      }
+
+      let front: Front;
+      try {
+        front = await this.frontClient
+          .send(FRONT_MESSAGES.getFrontForTask, {})
+          .toPromise();
+      } catch (error) {
+        throw new Error('Error retrieving front');
+      }
+
+      if (!front) {
+        throw new Error('Front not found');
+      }
+
+      if (front.taskTotal + 1 > front.maxTasks) {
         const newTaskDto = new CreateTaskDto(
           createTaskDto,
-          front.id,
+          null,
           timeToCompleteTask,
-          taskStatus.SCHEDULED,
+          taskStatus.UNSCHEDULED,
         );
 
         const newTask = this.taskRepository.create({
           ...newTaskDto,
-          front: front,
           user,
-          whenAddedToTheFront: new Date(),
+          whenAddedToTheFront: null,
         });
-        if (front.taskTotal === 0) {
-          newTask.status = taskStatus.DOING;
-          const { center_id } = await this.centerClient
-            .send(CENTER_MESSAGES.getCeterWithFrontId, { frontId: front.id })
-            .toPromise();
 
-          this.sendMessageToCenter(center_id, newTaskDto);
+        return await this.taskRepository.save(newTask);
+      } else {
+        const updateFrontTaskLengthAndTimeDto = new FrontUpdateTimeAndTasksDTO(
+          front.id,
+          timeToCompleteTask,
+        );
+
+        let wasFrontUpdated: boolean;
+        try {
+          wasFrontUpdated = await this.frontClient
+            .send(
+              FRONT_MESSAGES.addFrontTasksLength,
+              updateFrontTaskLengthAndTimeDto,
+            )
+            .toPromise();
+        } catch (error) {
+          throw new Error('Error updating front');
         }
 
-        const savedTask = await this.taskRepository.save(newTask);
+        if (wasFrontUpdated) {
+          try {
+            user = await this.userClient
+              .send(USER_MESSAGES.getUserForTask, {
+                userId: createTaskDto.userId,
+              })
+              .toPromise();
+          } catch (error) {
+            throw new Error('Error re-fetching user');
+          }
 
-        return savedTask;
+          // Create and save new Task
+          const newTaskDto = new CreateTaskDto(
+            createTaskDto,
+            front.id,
+            timeToCompleteTask,
+            taskStatus.SCHEDULED,
+          );
+
+          const newTask = this.taskRepository.create({
+            ...newTaskDto,
+            front,
+            user,
+            whenAddedToTheFront: new Date(),
+          });
+
+          if (front.taskTotal === 0) {
+            newTask.status = taskStatus.DOING;
+            // Handle sending message to center
+          }
+
+          return await this.taskRepository.save(newTask);
+        }
       }
+    } catch (error) {
+      console.error('Error creating task:', error);
+      throw error;
     }
   }
 
