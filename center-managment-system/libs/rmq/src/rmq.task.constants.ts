@@ -12,4 +12,7 @@ export const TASK_MESSAGES = {
   getBestTaskForFront: 'task.getBestTaskForFront',
   findNextTaskToDoInFront: 'task.findNextTaskToDoInFront',
   addFrontToTask: 'task.addFrontToTask',
+  deleteFrontFromTasks: 'task.deleteFrontFromTasks',
+  deleteTasksWithoutUser: 'task.deleteTasks',
+  sendTaskToDoAfterRestart: 'task.sendTaskToDoAfterRestart',
 };

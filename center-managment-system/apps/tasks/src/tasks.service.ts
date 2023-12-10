@@ -44,21 +44,6 @@ export class TasksService implements OnModuleInit {
   private channel: amqp.Channel;
   private exchange = 'center_exchange';
 
-  private async sendMessageToCenter(centerId: string, messageObject: any) {
-    try {
-      const queue = `${centerId}_queue`;
-      const message = JSON.stringify(messageObject);
-      await this.channel.publish(
-        this.exchange,
-        `center.${centerId}.task`,
-        Buffer.from(message),
-      );
-      console.log(`Message sent to queue ${queue}`);
-    } catch (error) {
-      console.error(`Error sending message to center ${centerId}:`, error);
-    }
-  }
-
   /**
    * Creates a new task.
    * @param createTaskDto Data Transfer Object for task creation.
@@ -68,7 +53,7 @@ export class TasksService implements OnModuleInit {
    */
   async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
     // Retrieve the Front object using the client proxy
-    const timeToCompleteTask = this.generateRandomTime(1);
+    const timeToCompleteTask = this.generateRandomTime(3);
 
     const front: Front = await this.frontClient
       .send(FRONT_MESSAGES.getFrontForTask, {})
@@ -128,6 +113,7 @@ export class TasksService implements OnModuleInit {
           whenAddedToTheFront: new Date(),
         });
         if (front.taskTotal === 0) {
+          newTask.status = taskStatus.DOING;
           const { center_id } = await this.centerClient
             .send(CENTER_MESSAGES.getCeterWithFrontId, { frontId: front.id })
             .toPromise();
@@ -149,7 +135,7 @@ export class TasksService implements OnModuleInit {
    * @throws NotFoundException If the task is not found.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async deleteTask(id: number) {
+  async deleteTask(id: number): Promise<boolean> {
     try {
       const result = await this.taskRepository.delete(id);
 
@@ -172,10 +158,11 @@ export class TasksService implements OnModuleInit {
    * @returns An array of task entities.
    * @throws InternalServerErrorException If no tasks are found or in case of an error.
    */
-  async getAllTasks() {
+  async getAllTasks(): Promise<Task[]> {
     try {
       const tasks = await this.taskRepository.find({
         select: ['id', 'processedAt', 'createdAt', 'status', 'description'],
+        relations: { user: true, front: true },
       });
 
       if (!tasks) {
@@ -198,7 +185,7 @@ export class TasksService implements OnModuleInit {
    * @throws BadRequestException If the provided ID is invalid.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async getTask(id: number) {
+  async getTask(id: number): Promise<Task> {
     try {
       if (isNaN(id) || id <= 0) {
         throw new BadRequestException('Invalid user ID');
@@ -236,7 +223,9 @@ export class TasksService implements OnModuleInit {
    * @throws NotFoundException If the task is not found.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async updateTaskState(updateTaskStateDto: UpdateTaskStateDTO) {
+  async updateTaskState(
+    updateTaskStateDto: UpdateTaskStateDTO,
+  ): Promise<boolean> {
     if (
       !updateTaskStateDto ||
       !updateTaskStateDto.id ||
@@ -284,11 +273,11 @@ export class TasksService implements OnModuleInit {
    * @returns The task entity that best fits the criteria.
    * @throws InternalServerErrorException If no suitable task is found or in case of an error.
    */
-  async getBestTaskForFront() {
+  async getBestTaskForFront(): Promise<Task | null> {
     try {
       const bestTaskForFront = await this.taskRepository.findOne({
         where: {
-          status: 'unscheduled',
+          status: taskStatus.UNSCHEDULED,
           whenAddedToTheFront: null,
         },
         order: {
@@ -318,7 +307,7 @@ export class TasksService implements OnModuleInit {
    * @throws NotFoundException If the task or front is not found.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async addFrontToTask(taskToAdd: AddTaskToFrontDTO) {
+  async addFrontToTask(taskToAdd: AddTaskToFrontDTO): Promise<boolean> {
     // Validate input
     if (!taskToAdd || !taskToAdd.id || !taskToAdd.frontId) {
       throw new BadRequestException('Invalid input data');
@@ -375,7 +364,7 @@ export class TasksService implements OnModuleInit {
    * @throws BadRequestException If the provided front ID is invalid.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async findNextTaskToDoInFront(frontId: number) {
+  async findNextTaskToDoInFront(frontId: number): Promise<Task | null> {
     // Validate input
     if (!frontId) {
       throw new BadRequestException('Invalid front ID');
@@ -385,7 +374,7 @@ export class TasksService implements OnModuleInit {
       const updatedTask = await this.taskRepository.findOne({
         where: {
           front: { id: frontId },
-          status: 'scheduled',
+          status: taskStatus.SCHEDULED,
         },
         relations: ['user', 'front'],
         order: {
@@ -429,6 +418,101 @@ export class TasksService implements OnModuleInit {
   }
 
   /**
+   * Deletes the association between a front and tasks by setting the 'front' property to null.
+   *
+   * @param frontId - The ID of the front to disassociate from tasks.
+   * @returns true if the operation was successful, or false if it failed.
+   */
+  async deleteFrontFromTasks(frontId: number): Promise<boolean> {
+    try {
+      const result = await this.taskRepository.update(
+        { front: { id: frontId } },
+        {
+          front: null,
+          whenAddedToTheFront: null,
+          status: taskStatus.UNSCHEDULED,
+        },
+      );
+
+      if (result.affected > 0) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      throw new Error(`Failed to delete front from tasks: ${error.message}`);
+    }
+  }
+
+  /**
+   * Deletes tasks that are not associated with a specific user.
+   *
+   * @param userId - The ID of the user whose tasks should be deleted.
+   * @returns true if there were tasks associated with the user and they were deleted, or false if no tasks were deleted.
+   * @throws Error if there's an error during the deletion process.
+   */
+  async deleteTasksWithoutUser(userId: number): Promise<boolean> {
+    try {
+      // Check if there are tasks with status "doing" for the user
+      const tasksDoing = await this.taskRepository.find({
+        where: { user: { id: userId }, status: taskStatus.DOING },
+      });
+
+      if (tasksDoing.length > 0) {
+        return false; // There are tasks with status "doing," return false
+      }
+
+      // If no tasks with status "doing" are found, proceed to delete tasks without a user
+      const result = await this.taskRepository.delete({
+        user: { id: userId },
+      });
+
+      if (result.affected > 0) {
+        return true; // Tasks were deleted
+      } else {
+        return false; // No tasks were deleted
+      }
+    } catch (error) {
+      throw new Error(`Failed to delete tasks: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sends a task to do after a system restart to the specified center.
+   *
+   * @param centerId - The ID of the center to send the task to.
+   * @param frontId - The ID of the front associated with the task.
+   */
+  async sendTaskToDoAfterRestart(
+    centerId: number,
+    frontId: number,
+  ): Promise<void> {
+    const taskTodo = await this.taskRepository.findOne({
+      where: {
+        front: { id: frontId },
+        status: taskStatus.DOING,
+      },
+      relations: { user: true },
+    });
+
+    if (taskTodo) {
+      const newTaskToDo = new TaskToDoDTO(
+        taskTodo.id,
+        taskTodo.description,
+        taskTodo.status,
+        taskTodo.createdAt,
+        taskTodo.processedAt,
+        taskTodo.user.id,
+        frontId,
+      );
+
+      await this.sendMessageToCenter(centerId.toString(), newTaskToDo);
+    } else {
+      console.log('No task found with the specified criteria.');
+    }
+  }
+
+  /**
    * Generates a random time interval based on the provided number.
    */
   private generateRandomTime(num) {
@@ -443,6 +527,27 @@ export class TasksService implements OnModuleInit {
       return Math.floor(Math.random() * (172800000 - 86400000 + 1) + 86400000); // 1d to 2d
     } else {
       return null; // Invalid input
+    }
+  }
+
+  /**
+   * Sends a JSON message to a specific message queue associated with a center.
+   *
+   * @param centerId - The ID of the center to send the message to.
+   * @param messageObject - The JSON message object to send.
+   */
+  private async sendMessageToCenter(centerId: string, messageObject: any) {
+    try {
+      const queue = `${centerId}_queue`;
+      const message = JSON.stringify(messageObject);
+      await this.channel.publish(
+        this.exchange,
+        `center.${centerId}.task`,
+        Buffer.from(message),
+      );
+      console.log(`Message sent to queue ${queue}`);
+    } catch (error) {
+      console.error(`Error sending message to center ${centerId}:`, error);
     }
   }
 }

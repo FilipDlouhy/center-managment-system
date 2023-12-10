@@ -47,6 +47,12 @@ export class CentersService implements OnModuleInit {
 
     centers.forEach(async (center) => {
       await this.setupQueueForCenter(center.id.toString());
+      await this.taskClient
+        .send(TASK_MESSAGES.sendTaskToDoAfterRestart, {
+          centerId: center.id,
+          frontId: center.front.id,
+        })
+        .toPromise();
     });
   }
 
@@ -77,6 +83,11 @@ export class CentersService implements OnModuleInit {
     }
   }
 
+  /**
+   * Consumes messages from a specific message queue associated with a center.
+   *
+   * @param centerId - The ID of the center whose messages are being consumed.
+   */
   private async consumeMessagesFromCenter(centerId: string) {
     const queueName = `${centerId}_queue`;
 
@@ -157,24 +168,13 @@ export class CentersService implements OnModuleInit {
     });
   }
 
-  async sendMessageToCenter(centerId: string, messageObject: any) {
-    const queue = `${centerId}_queue`;
-    const message = JSON.stringify(messageObject);
-    await this.channel.publish(
-      this.exchange,
-      `center.${centerId}.task`,
-      Buffer.from(message),
-    );
-    console.log(`Message sent to queue ${queue}`);
-  }
-
   /**
    * Creates a new center.
    * @param centerData Data for creating a new center.
    * @returns The created center.
    * @throws InternalServerErrorException If there's an error during creation.
    */
-  async createCenter(centerData: CreateCenterDto) {
+  async createCenter(centerData: CreateCenterDto): Promise<Center> {
     try {
       const front = await this.frontClient
         .send(FRONT_MESSAGES.frontCreate, {})
@@ -202,7 +202,7 @@ export class CentersService implements OnModuleInit {
    * @returns A list of centers.
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
-  async getCenters() {
+  async getCenters(): Promise<Center[]> {
     try {
       return await this.centerRepository.find({
         relations: ['front', 'front.tasks'],
@@ -222,7 +222,7 @@ export class CentersService implements OnModuleInit {
    * @throws NotFoundException If the center is not found.
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
-  async getCenter(id: number) {
+  async getCenter(id: number): Promise<Center> {
     try {
       const center = await this.centerRepository.findOne({
         where: { id },
@@ -339,7 +339,7 @@ export class CentersService implements OnModuleInit {
    * @param frontIdDto DTO containing the front ID.
    * @returns The center associated with the given front ID.
    */
-  async getCenterForTasks(frontIdDto: { frontId: number }) {
+  async getCenterForTasks(frontIdDto: { frontId: number }): Promise<any> {
     const frontId = frontIdDto.frontId;
     const center = await this.centerRepository
       .createQueryBuilder('center')

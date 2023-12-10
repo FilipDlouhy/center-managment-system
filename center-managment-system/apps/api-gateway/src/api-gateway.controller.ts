@@ -46,7 +46,7 @@ export class ApiGatewayController {
         response = await this.apiGatewayService.rerouteToService(
           path,
           data,
-          'center',
+          'task',
         );
         return response;
 

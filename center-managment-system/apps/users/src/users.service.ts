@@ -1,16 +1,19 @@
 import { LoginUserDTO } from '@app/database/dtos/userDtos/loginUser.dto';
-import { UpdateUserRequestDTO } from '@app/database/dtos/userDtos/updateUserRequest.dto';
 import { CreateUserDTO } from '@app/database/dtos/userDtos/createUser.dto';
 import { User } from '@app/database/entities/user.entity';
 import {
   BadRequestException,
   Injectable,
+  Inject,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository, QueryFailedError } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { TASK_MESSAGES, TASK_QUEUE } from '@app/rmq/rmq.task.constants';
+import { ClientProxy } from '@nestjs/microservices';
+import { UpdateUserDTO } from '@app/database/dtos/userDtos/updateUser.dto';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +21,8 @@ export class UsersService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly entityManager: EntityManager,
+    @Inject(TASK_QUEUE.serviceName)
+    private readonly taskClient: ClientProxy,
   ) {}
 
   /**
@@ -26,7 +31,7 @@ export class UsersService {
    * @returns The created UserDTO.
    * @throws BadRequestException If the provided data is invalid or email already exists.
    */
-  async createUser(data: CreateUserDTO) {
+  async createUser(data: CreateUserDTO): Promise<User> {
     try {
       const userDto = new CreateUserDTO(data);
       userDto.password = await bcrypt.hash(userDto.password, 10);
@@ -109,7 +114,7 @@ export class UsersService {
    * @throws BadRequestException If the provided ID is invalid.
    * @throws NotFoundException If the user is not found.
    */
-  async updateUser(updateUserDto: UpdateUserRequestDTO): Promise<User | null> {
+  async updateUser(updateUserDto: UpdateUserDTO): Promise<User | null> {
     try {
       if (isNaN(updateUserDto.id) || updateUserDto.id <= 0) {
         throw new BadRequestException('Invalid user ID');
@@ -127,17 +132,14 @@ export class UsersService {
           }
 
           // Updating user fields if provided
-          if (updateUserDto.data.email && updateUserDto.data.email.length > 0) {
-            user.email = updateUserDto.data.email;
+          if (updateUserDto.email && updateUserDto.email.length > 0) {
+            user.email = updateUserDto.email;
           }
-          if (
-            updateUserDto.data.password &&
-            updateUserDto.data.password.length > 0
-          ) {
-            user.password = updateUserDto.data.password;
+          if (updateUserDto.password && updateUserDto.password.length > 0) {
+            user.password = await bcrypt.hash(updateUserDto.password, 10);
           }
-          if (updateUserDto.data.name && updateUserDto.data.name.length > 0) {
-            user.name = updateUserDto.data.name;
+          if (updateUserDto.name && updateUserDto.name.length > 0) {
+            user.name = updateUserDto.name;
           }
 
           await transactionalEntityManager.save(user);
@@ -165,9 +167,18 @@ export class UsersService {
    */
   async deleteUser(id: number): Promise<boolean> {
     try {
+      // Check if there are ongoing tasks for the user
+      const deleteTasksWithoutUser = await this.taskClient
+        .send(TASK_MESSAGES.deleteTasksWithoutUser, { userId: id })
+        .toPromise();
+
+      if (!deleteTasksWithoutUser) {
+        throw new Error('User has ongoing tasks. Deletion not allowed.');
+      }
+
       const result = await this.userRepository.delete(id);
 
-      if (result.affected && result.affected > 0) {
+      if (result.affected && result.affected > 0 && deleteTasksWithoutUser) {
         return true;
       } else {
         throw new NotFoundException('User not found');
@@ -193,7 +204,7 @@ export class UsersService {
       const user = await this.userRepository.findOne({
         where: { email: loginUserDto.email },
         relations: { tasks: true },
-        select: ['id', 'name', 'email', 'admin'],
+        select: ['id', 'name', 'email', 'admin', 'password'],
       });
 
       if (!user) {

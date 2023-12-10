@@ -4,7 +4,7 @@ import { UpdateLengthDTO } from '@app/database/dtos/frontDtos/updateLength.dto';
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { Front } from '@app/database/entities/front.entity';
 import { frontLength } from '@app/database/front.length.constant';
-import { TASK_QUEUE } from '@app/rmq/rmq.task.constants';
+import { TASK_MESSAGES, TASK_QUEUE } from '@app/rmq/rmq.task.constants';
 import {
   BadRequestException,
   Inject,
@@ -31,7 +31,7 @@ export class FrontsService {
    * @returns The created front data.
    * @throws InternalServerErrorException If there's an error during creation.
    */
-  async createFront() {
+  async createFront(): Promise<FrontDTO> {
     try {
       const frontData = {
         maxTasks: frontLength,
@@ -55,7 +55,7 @@ export class FrontsService {
    * @returns A list of all fronts.
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
-  async getFronts() {
+  async getFronts(): Promise<Front[]> {
     try {
       return await this.frontRepository.find({
         relations: { tasks: true },
@@ -75,7 +75,7 @@ export class FrontsService {
    * @throws NotFoundException If the front is not found.
    * @throws InternalServerErrorException If there's an error during retrieval.
    */
-  async getFront(id: number) {
+  async getFront(id: number): Promise<Front> {
     try {
       const front = await this.frontRepository.findOne({
         where: { id },
@@ -95,20 +95,32 @@ export class FrontsService {
   }
 
   /**
-   * Deletes a front from the database.
+   * Deletes a front from the database and associated tasks.
    * @param id The ID of the front to delete.
    * @returns A boolean indicating whether the deletion was successful.
    * @throws NotFoundException If the front is not found.
    * @throws InternalServerErrorException If there's an error during deletion.
    */
-  async deleteFront(id: number) {
+  async deleteFront(id: number): Promise<boolean> {
     try {
-      const result = await this.frontRepository.delete(id);
+      // Delete front from associated tasks first
+      const deleteFrontFromTasks = await this.taskClient
+        .send(TASK_MESSAGES.deleteFrontFromTasks, {
+          frontId: id,
+        })
+        .toPromise();
 
-      if (result.affected && result.affected > 0) {
-        return true;
+      // Check if deleteFrontFromTasks was successful
+      if (deleteFrontFromTasks === true) {
+        const result = await this.frontRepository.delete(id);
+
+        if (result.affected && result.affected > 0) {
+          return true; // Both operations were successful
+        } else {
+          throw new NotFoundException('Front not found');
+        }
       } else {
-        throw new NotFoundException('Front not found');
+        throw new Error('Failed to delete front from tasks');
       }
     } catch (error) {
       console.error('Error while deleting front:', error);
@@ -153,7 +165,7 @@ export class FrontsService {
    * Retrieves the best front for assigning a task.
    * @returns The best suited front.
    */
-  async getFrontForTask() {
+  async getFrontForTask(): Promise<Front> {
     // Assuming 'frontRepository' is your repository object for the 'Front' entity
     const sortedFront = await this.frontRepository.find({
       order: {
@@ -231,7 +243,7 @@ export class FrontsService {
    */
   async deleteFrontTaskLength(
     frontLengthUpdateDto: FrontUpdateTimeAndTasksDTO,
-  ) {
+  ): Promise<boolean> {
     // Validate input
     if (
       !frontLengthUpdateDto ||
@@ -287,7 +299,9 @@ export class FrontsService {
    * @throws NotFoundException If the front is not found.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async addBestTaskToFront(frontUpdateTaskDto: AddTaskToFrontDTO) {
+  async addBestTaskToFront(
+    frontUpdateTaskDto: AddTaskToFrontDTO,
+  ): Promise<boolean> {
     // Validate input
     if (
       !frontUpdateTaskDto ||
