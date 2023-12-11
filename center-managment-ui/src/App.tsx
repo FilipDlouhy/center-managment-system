@@ -12,26 +12,16 @@ import { UserDto } from "./DTOS/user.dto";
 import UserTaskPage from "./pages/UserTaskPage";
 import { TaskDto } from "./DTOS/task.dto";
 import { io } from "socket.io-client";
+import AdminPage from "./pages/AdminPage";
+import { TaskAdminDto } from "./DTOS/taskAdmin.dto";
 
 function App() {
   const [user, setUser] = useState<UserDto | undefined>(undefined);
   const [task, setTask] = useState<TaskDto | undefined>(undefined);
-  useEffect(() => {
-    const socket = io("http://localhost:3000"); // Replace with your WebSocket server URL
+  const [taskAdmin, setTaskAdmin] = useState<TaskAdminDto | undefined>(
+    undefined
+  );
 
-    socket.on("message", (data) => {
-      console.log("Message from server:", data);
-      // Handle the message. For example, update the task
-      if (data.task) {
-        setTask(data.task);
-      }
-    });
-
-    // Cleanup on unmount
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
   return (
     <CenterSystemContext.Provider
       value={{
@@ -39,6 +29,8 @@ function App() {
         setUser,
         task: task,
         setTask,
+        taskAdmin: taskAdmin,
+        setTaskAdmin,
       }}
     >
       <Router>
@@ -62,6 +54,10 @@ function App() {
           <Route
             path="/user/tasks-page"
             element={user ? <UserTaskPage /> : <Navigate to="/" replace />}
+          />
+          <Route
+            path="/admin/admin-page"
+            element={user ? <AdminPage /> : <Navigate to="/" replace />}
           />
         </Routes>
       </Router>

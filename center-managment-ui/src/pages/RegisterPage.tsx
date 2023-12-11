@@ -28,6 +28,10 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
+
+    if (formData.email.toLowerCase().includes("admin")) {
+      formData.admin = true;
+    }
     if (!formData.name || !formData.email || !formData.password) {
       setErrorText("Please fill in all fields.");
       return;
@@ -40,9 +44,10 @@ export default function RegisterPage() {
       );
       if (response.status === 200) {
         const { setUser } = context;
-        console.log(response.data);
         setUser(response.data);
-        navigate("/user/tasks-page");
+        navigate(
+          response.data.admin ? "/admin/admin-page" : "/user/tasks-page"
+        );
       }
     } catch (error: any) {
       console.error("Server responded with an error:", error.response.data);

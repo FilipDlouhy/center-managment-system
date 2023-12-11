@@ -1,20 +1,25 @@
 import { createContext, Dispatch, SetStateAction } from "react";
 import { UserDto } from "../DTOS/user.dto";
 import { TaskDto } from "../DTOS/task.dto";
+import { TaskAdminDto } from "../DTOS/taskAdmin.dto";
 
 type CenterSystemContextValue = {
   user?: UserDto;
-  task?: TaskDto; // Add task property
+  task?: TaskDto;
+  taskAdmin?: TaskAdminDto; // Add task property // Add task property
   setUser: Dispatch<SetStateAction<UserDto | undefined>>;
-  setTask: Dispatch<SetStateAction<TaskDto | undefined>>; // Add setTask setter
+  setTask: Dispatch<SetStateAction<TaskDto | undefined>>;
+  setTaskAdmin: Dispatch<SetStateAction<TaskAdminDto | undefined>>; // Add setTask setter // Add setTask setter
 };
 
 // Providing a default value for the context
 const defaultContextValue: CenterSystemContextValue = {
   user: undefined,
-  task: undefined, // Set task to undefined initially
+  task: undefined,
+  taskAdmin: undefined, // Set task to undefined initially // Set task to undefined initially
   setUser: () => {},
-  setTask: () => {}, // Add an empty function as a placeholder for setTask
+  setTask: () => {},
+  setTaskAdmin: () => {}, // Add an empty function as a placeholder for setTask // Add an empty function as a placeholder for setTask
 };
 
 const CenterSystemContext =

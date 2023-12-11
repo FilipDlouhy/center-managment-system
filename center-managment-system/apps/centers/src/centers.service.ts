@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { ClientProxy } from '@nestjs/microservices';
+import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { FRONT_MESSAGES, FRONT_QUEUE } from '@app/rmq/rmq.front.constants';
 import { UpdateCenterDto } from '@app/database/dtos/centerDtos/updateCenter.dto';
 import * as amqp from 'amqplib';
@@ -191,9 +191,7 @@ export class CentersService implements OnModuleInit {
       return savedCenter;
     } catch (error) {
       console.error(error);
-      throw new InternalServerErrorException(
-        'Error while creating center: ' + error.message,
-      );
+      throw new RpcException('Error while creating center: ' + error.message);
     }
   }
 
@@ -209,9 +207,7 @@ export class CentersService implements OnModuleInit {
       });
     } catch (error) {
       console.error('An error occurred while fetching centers:', error);
-      throw new InternalServerErrorException(
-        'Error while fetching centers: ' + error.message,
-      );
+      throw new RpcException('Error while fetching centers: ' + error.message);
     }
   }
 
@@ -236,7 +232,7 @@ export class CentersService implements OnModuleInit {
       return center;
     } catch (error) {
       console.error('An error occurred while fetching the center:', error);
-      throw new InternalServerErrorException(
+      throw new RpcException(
         'Error while fetching the center: ' + error.message,
       );
     }
@@ -257,7 +253,7 @@ export class CentersService implements OnModuleInit {
       });
 
       if (!center) {
-        throw new NotFoundException('Center not found');
+        throw new RpcException('Center not found');
       }
 
       const deleteResult = await this.centerRepository.delete(id);

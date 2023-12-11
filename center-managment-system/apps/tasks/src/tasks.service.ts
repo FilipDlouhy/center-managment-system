@@ -465,13 +465,13 @@ export class TasksService implements OnModuleInit {
         },
       );
 
-      if (result.affected > 0) {
+      if (result.affected >= 0) {
         return true;
       } else {
         return false;
       }
     } catch (error) {
-      throw new Error(`Failed to delete front from tasks: ${error.message}`);
+      throw new Error(`Failed WWW delete front from tasks: ${error.message}`);
     }
   }
 
@@ -518,19 +518,25 @@ export class TasksService implements OnModuleInit {
     centerId: number,
     frontId: number,
   ): Promise<void> {
-    const taskTodo = await this.taskRepository.findOne({
-      where: {
-        front: { id: frontId },
-        status: taskStatus.DOING,
-      },
-      relations: { user: true },
-    });
+    try {
+      const taskTodo = await this.taskRepository.findOne({
+        where: {
+          front: { id: frontId },
+          status: taskStatus.DOING,
+        },
+        relations: { user: true },
+      });
 
-    const taskTodoCreatedAt = new Date(taskTodo.createdAt).getTime();
+      if (!taskTodo) {
+        console.log('No task found with the specified criteria.');
+        return;
+      }
 
-    const currentTime = new Date().getTime();
-    const millisecondsDifference = currentTime - taskTodoCreatedAt;
-    if (taskTodo) {
+      const taskTodoCreatedAt = new Date(taskTodo.createdAt).getTime();
+
+      const currentTime = new Date().getTime();
+      const millisecondsDifference = currentTime - taskTodoCreatedAt;
+
       const newTaskToDo = new TaskToDoDTO(
         taskTodo.id,
         taskTodo.description,
@@ -546,8 +552,8 @@ export class TasksService implements OnModuleInit {
       await this.taskRepository.save(taskTodo);
 
       await this.sendMessageToCenter(centerId.toString(), newTaskToDo);
-    } else {
-      console.log('No task found with the specified criteria.');
+    } catch (error) {
+      console.error('An error occurred while processing the task:', error);
     }
   }
 

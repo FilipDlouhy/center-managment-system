@@ -61,6 +61,7 @@ export class UsersService {
   async getAllUsers(): Promise<User[]> {
     try {
       const users = await this.userRepository.find({
+        where: { admin: false },
         select: ['id', 'name', 'email', 'admin'],
       });
 

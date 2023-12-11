@@ -1,6 +1,10 @@
 import React, { useContext, useState } from "react";
 import CenterSystemContext from "../../context/context";
-import { appendToUrl } from "../../consts/consts";
+import {
+  appendToUrl,
+  formatISODate,
+  formatISODateWithOffset,
+} from "../../consts/consts";
 import axios from "axios";
 
 function TaskInfo() {
@@ -8,28 +12,6 @@ function TaskInfo() {
   const { task } = context;
   const { setTask } = context;
   const [errorText, setErrorText] = useState<string>(" Info about your task");
-
-  const formatISODate = (dateString: Date | undefined) => {
-    if (dateString) {
-      const dateObject = new Date(dateString);
-      return dateObject.toLocaleString();
-    } else {
-      return "Invalid date";
-    }
-  };
-
-  const formatISODateWithOffset = (
-    dateString: Date | undefined,
-    offsetMilliseconds: number | undefined
-  ) => {
-    if (dateString && offsetMilliseconds) {
-      const originalDate = new Date(dateString);
-      const newDate = new Date(originalDate.getTime() + offsetMilliseconds);
-      return newDate.toLocaleString();
-    } else {
-      return "Invalid date";
-    }
-  };
 
   const deleteTask = async () => {
     if (task?.status === "doing") {

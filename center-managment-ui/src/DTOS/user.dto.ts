@@ -4,7 +4,7 @@ export class UserDto {
   name!: string;
   password!: string;
   email!: string;
-  Tasks?: TaskDto[];
+  tasks?: TaskDto[];
   admin!: boolean;
 
   constructor(user: Partial<UserDto>) {

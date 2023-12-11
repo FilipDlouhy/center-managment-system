@@ -120,7 +120,7 @@ export class FrontsService {
           throw new NotFoundException('Front not found');
         }
       } else {
-        throw new Error('Failed to delete front from tasks');
+        throw new Error('Failed asdasdasdasdada to delete front from tasks');
       }
     } catch (error) {
       console.error('Error while deleting front:', error);
