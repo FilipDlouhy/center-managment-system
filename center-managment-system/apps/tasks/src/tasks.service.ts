@@ -62,6 +62,7 @@ export class TasksService implements OnModuleInit {
         user = await this.userClient
           .send(USER_MESSAGES.getUserForTask, { userId: createTaskDto.userId })
           .toPromise();
+        console.log(user);
       } catch (error) {
         throw new Error('Error retrieving user');
       }
@@ -96,8 +97,8 @@ export class TasksService implements OnModuleInit {
           user,
           whenAddedToTheFront: null,
         });
-
-        return await this.taskRepository.save(newTask);
+        await this.taskRepository.save(newTask);
+        return newTask;
       } else {
         const updateFrontTaskLengthAndTimeDto = new FrontUpdateTimeAndTasksDTO(
           front.id,
@@ -170,13 +171,13 @@ export class TasksService implements OnModuleInit {
       if (result.affected && result.affected > 0) {
         return true;
       } else {
-        throw new NotFoundException('User not found');
+        throw new NotFoundException('Task not found');
       }
     } catch (error) {
-      console.error('Error while deleting user:', error);
+      console.error('Error while deleting task:', error);
 
       throw new InternalServerErrorException(
-        'Error while deleting user: ' + error.message,
+        'Error while deleting task: ' + error.message,
       );
     }
   }
@@ -213,25 +214,27 @@ export class TasksService implements OnModuleInit {
    * @throws BadRequestException If the provided ID is invalid.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async getTask(id: number): Promise<Task> {
+  async getTask(id: number, user: boolean): Promise<Task> {
     try {
       if (isNaN(id) || id <= 0) {
         throw new BadRequestException('Invalid user ID');
       }
 
-      const task = await this.taskRepository.findOne({
-        where: { id },
-        relations: { front: true, user: true },
-        select: ['id', 'processedAt', 'createdAt', 'status', 'description'],
-      });
-      const dtoTest = new CreateTaskDto(
-        task,
-        task.front.id,
-        task.processedAt,
-        task.status,
-      );
+      let task: Task;
+      if (user) {
+        task = await this.taskRepository.findOne({
+          where: { id },
+          relations: { front: false, user: false },
+          select: ['id', 'processedAt', 'createdAt', 'status', 'description'],
+        });
+      } else {
+        task = await this.taskRepository.findOne({
+          where: { id },
+          relations: { front: true, user: true },
+          select: ['id', 'processedAt', 'createdAt', 'status', 'description'],
+        });
+      }
 
-      dtoTest.userId = task.user.id;
       if (!task) {
         throw new NotFoundException('User not found');
       }
@@ -523,6 +526,10 @@ export class TasksService implements OnModuleInit {
       relations: { user: true },
     });
 
+    const taskTodoCreatedAt = new Date(taskTodo.createdAt).getTime();
+
+    const currentTime = new Date().getTime();
+    const millisecondsDifference = currentTime - taskTodoCreatedAt;
     if (taskTodo) {
       const newTaskToDo = new TaskToDoDTO(
         taskTodo.id,
@@ -534,9 +541,78 @@ export class TasksService implements OnModuleInit {
         frontId,
       );
 
+      taskTodo.processedAt = taskTodo.processedAt + millisecondsDifference;
+
+      await this.taskRepository.save(taskTodo);
+
       await this.sendMessageToCenter(centerId.toString(), newTaskToDo);
     } else {
       console.log('No task found with the specified criteria.');
+    }
+  }
+
+  /**
+   * Get tasks for a specific user by userId.
+   * @param userId - The ID of the user for whom tasks should be retrieved.
+   * @returns A Promise that resolves to an array of Task objects.
+   * @throws NotFoundException if the user with the specified userId is not found.
+   */
+  async getUsersTasks(userId: number): Promise<Task[]> {
+    try {
+      // Find tasks for the user with the specified userId
+      const usersTasks = await this.taskRepository.find({
+        where: {
+          user: { id: userId },
+        },
+        select: ['id', 'description'],
+      });
+
+      if (!usersTasks) {
+        // Throw NotFoundException if the user's tasks are not found
+        throw new NotFoundException(
+          `Tasks for user with ID ${userId} not found.`,
+        );
+      }
+
+      return usersTasks;
+    } catch (error) {
+      // Handle exceptions here
+      throw new InternalServerErrorException(
+        'An error occurred while fetching user tasks.',
+      );
+    }
+  }
+
+  /**
+   * Get tasks for a specific user by userId and if they are being processed right now.
+   * @param userId - The ID of the user for whom tasks should be retrieved.
+   * @returns A Promise that resolves to an array of Task objects.
+   * @throws NotFoundException if the user with the specified userId is not found.
+   */
+  async getUsersTasksCurrent(userId: number) {
+    try {
+      // Find tasks for the user with the specified userId
+      const usersTasks = await this.taskRepository.find({
+        where: {
+          user: { id: userId },
+          status: taskStatus.DOING,
+        },
+        select: ['id', 'description'],
+      });
+
+      if (!usersTasks) {
+        // Throw NotFoundException if the user's tasks are not found
+        throw new NotFoundException(
+          `Tasks for user with ID ${userId} not found.`,
+        );
+      }
+
+      return usersTasks;
+    } catch (error) {
+      // Handle exceptions here
+      throw new InternalServerErrorException(
+        'An error occurred while fetching user tasks.',
+      );
     }
   }
 

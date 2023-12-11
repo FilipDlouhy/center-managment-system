@@ -42,10 +42,20 @@ export class TasksController {
   }
 
   // Get a task by its ID
-  @MessagePattern(TASK_MESSAGES.getTask)
-  async getTask(id: number): Promise<Task> {
+  @MessagePattern(TASK_MESSAGES.getTaskUser)
+  async getTaskUser(id: number): Promise<Task> {
     try {
-      return await this.tasksService.getTask(id);
+      return await this.tasksService.getTask(id, true);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
+  }
+
+  // Get a task by its ID
+  @MessagePattern(TASK_MESSAGES.getTaskAdmin)
+  async getTaskAdmin(id: number): Promise<Task> {
+    try {
+      return await this.tasksService.getTask(id, false);
     } catch (error) {
       throw new RpcException(error.message);
     }
@@ -141,6 +151,26 @@ export class TasksController {
         centerId,
         frontId,
       );
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
+  }
+
+  // get users tasks
+  @MessagePattern(TASK_MESSAGES.getUsersTasks)
+  async getUsersTasks({ userId }: { userId: number }): Promise<Task[]> {
+    try {
+      return await this.tasksService.getUsersTasks(userId);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
+  }
+
+  // get users tasks wchich are being done
+  @MessagePattern(TASK_MESSAGES.getUsersTasksCurrent)
+  async getUsersTasksCurrent({ userId }: { userId: number }): Promise<Task[]> {
+    try {
+      return await this.tasksService.getUsersTasksCurrent(userId);
     } catch (error) {
       throw new RpcException(error.message);
     }

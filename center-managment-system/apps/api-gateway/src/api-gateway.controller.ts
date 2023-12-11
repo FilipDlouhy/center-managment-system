@@ -15,7 +15,7 @@ export class ApiGatewayController {
     if (req.method === 'POST' || req.method === 'PUT') {
       requestBody = req.body;
     }
-    // Reroute the request based on the path and request data
+
     const response = await this.rerouteRequest(req.path, requestBody);
     return response;
   }

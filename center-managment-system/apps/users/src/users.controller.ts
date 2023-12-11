@@ -75,7 +75,7 @@ export class UsersController {
   @MessagePattern(USER_MESSAGES.userLogin)
   async lofinUser(@Payload() loginUser: LoginUserDTO): Promise<User> {
     try {
-      return this.usersService.loginUser(loginUser);
+      return await this.usersService.loginUser(loginUser);
     } catch (error) {
       throw new RpcException(error.message);
     }

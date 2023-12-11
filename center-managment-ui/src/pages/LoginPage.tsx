@@ -46,7 +46,7 @@ export default function LoginPage() {
         const { setUser } = context;
         console.log(response.data);
         setUser(response.data);
-        navigate("/user/task-page");
+        navigate("/user/tasks-page");
       }
     } catch (error: any) {
       console.error("Server responded with an error:", error.response.data);

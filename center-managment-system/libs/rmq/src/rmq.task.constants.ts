@@ -6,7 +6,8 @@ export const TASK_QUEUE = {
 export const TASK_MESSAGES = {
   createTask: 'task.created',
   getAllTasks: 'tasks.getAll',
-  getTask: 'task.get',
+  getTaskAdmin: 'task.getTaskAdmin',
+  getTaskUser: 'task.getTaskUser',
   updateTaskState: 'task.updateState',
   deleteTask: 'task.delete',
   getBestTaskForFront: 'task.getBestTaskForFront',
@@ -15,4 +16,6 @@ export const TASK_MESSAGES = {
   deleteFrontFromTasks: 'task.deleteFrontFromTasks',
   deleteTasksWithoutUser: 'task.deleteTasks',
   sendTaskToDoAfterRestart: 'task.sendTaskToDoAfterRestart',
+  getUsersTasks: 'users.getUsersTasks',
+  getUsersTasksCurrent: 'users.getUsersTasksCurrent',
 };

@@ -57,7 +57,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
         },
       },
     ]),
-    CacheModule.register({ ttl: 3600 * 3 }),
+    CacheModule.register(),
   ],
   controllers: [ApiGatewayController],
   providers: [
