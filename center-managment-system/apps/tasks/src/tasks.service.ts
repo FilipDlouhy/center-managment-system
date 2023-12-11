@@ -54,7 +54,7 @@ export class TasksService implements OnModuleInit {
   async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
     try {
       // Generate random time for task completion
-      const timeToCompleteTask = this.generateRandomTime(3);
+      const timeToCompleteTask = this.generateRandomTime(1);
 
       // Retrieve User
       let user: User;
@@ -67,7 +67,7 @@ export class TasksService implements OnModuleInit {
         throw new Error('Error retrieving user');
       }
 
-      if (user.tasks.length >= 5) {
+      if (user.tasks.length >= 80) {
         throw new Error('User has too many tasks');
       }
 
@@ -145,7 +145,11 @@ export class TasksService implements OnModuleInit {
 
           if (front.taskTotal === 0) {
             newTask.status = taskStatus.DOING;
-            // Handle sending message to center
+            const frontId = front.id;
+            const { center_id } = await this.centerClient
+              .send(CENTER_MESSAGES.getCeterWithFrontId, { frontId })
+              .toPromise();
+            await this.sendMessageToCenter(center_id, newTaskDto);
           }
 
           return await this.taskRepository.save(newTask);
@@ -647,6 +651,7 @@ export class TasksService implements OnModuleInit {
    * @param messageObject - The JSON message object to send.
    */
   private async sendMessageToCenter(centerId: string, messageObject: any) {
+    console.log('ASFASF');
     try {
       const queue = `${centerId}_queue`;
       const message = JSON.stringify(messageObject);

@@ -90,7 +90,7 @@ export class CentersService implements OnModuleInit {
    */
   private async consumeMessagesFromCenter(centerId: string) {
     const queueName = `${centerId}_queue`;
-
+    console.log('ASFASFASF');
     // Start consuming messages from the queue
     await this.channel.consume(queueName, async (msg) => {
       // Check if a message is received
