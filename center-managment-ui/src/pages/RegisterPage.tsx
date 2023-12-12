@@ -1,10 +1,9 @@
 import React, { useState, ChangeEvent, FormEvent, useContext } from "react";
-import { Link } from "react-router-dom";
-import { UserDto } from "../DTOS/user.dto";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { UserDto } from "../DTOS/user.dto";
 import { appendToUrl } from "../consts/consts";
 import CenterSystemContext from "../context/context";
-import { useNavigate } from "react-router-dom";
 
 export default function RegisterPage() {
   const initialFormData: UserDto = {
@@ -13,45 +12,52 @@ export default function RegisterPage() {
     password: "",
     admin: false,
   };
-  const context = useContext(CenterSystemContext);
+
+  const { setUser } = useContext(CenterSystemContext);
   const [formData, setFormData] = useState<UserDto>(initialFormData);
-  const [errorText, setErrorText] = useState<string>(" Create your account");
+  const [errorText, setErrorText] = useState<string>("Create your account");
   const navigate = useNavigate();
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const updatedFormData = {
+      ...formData,
+      admin: formData.email.toLowerCase().includes("admin"),
+    };
 
-    if (formData.email.toLowerCase().includes("admin")) {
-      formData.admin = true;
-    }
-    if (!formData.name || !formData.email || !formData.password) {
+    if (
+      !updatedFormData.name ||
+      !updatedFormData.email ||
+      !updatedFormData.password
+    ) {
       setErrorText("Please fill in all fields.");
       return;
     }
+
     try {
-      console.log(appendToUrl("user/create-user"));
       const response = await axios.post(
         appendToUrl("user/create-user"),
-        formData
+        updatedFormData
       );
       if (response.status === 200) {
-        const { setUser } = context;
         setUser(response.data);
         navigate(
           response.data.admin ? "/admin/admin-page" : "/user/tasks-page"
         );
       }
-    } catch (error: any) {
-      console.error("Server responded with an error:", error.response.data);
-      setErrorText(error.response.data.message);
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Server responded with an error:", error.response.data);
+        setErrorText(error.response.data.message || "An error occurred");
+      } else {
+        console.error("An unknown error occurred:", error);
+        setErrorText("An unknown error occurred");
+      }
     }
   };
 
@@ -131,7 +137,7 @@ export default function RegisterPage() {
 
             <div>
               <button
-                onClick={(e) => handleSubmit(e)}
+                onClick={(e: any) => handleSubmit(e)}
                 type="submit"
                 className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               >

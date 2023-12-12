@@ -25,7 +25,6 @@ function User({
               appendToUrl(`user/get-user/${id}`)
             );
             if (response.status === 200) {
-              console.log(response);
               setUserShow(response.data);
             }
           } catch (error) {

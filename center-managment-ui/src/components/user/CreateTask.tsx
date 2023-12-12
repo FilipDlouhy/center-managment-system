@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, ChangeEvent } from "react";
 import CenterSystemContext from "../../context/context";
 import { CreateTaskDto } from "../../DTOS/createTask.dto";
 import axios from "axios";
@@ -7,19 +7,34 @@ import { appendToUrl } from "../../consts/consts";
 function CreateTask() {
   const [taskDescription, setTaskDescription] = useState("");
   const [errorText, setErrorText] = useState("Add description to your task");
-  const [showResponseText, setShowResponseText] = useState<boolean>(false);
-  const [responseText, setResponseText] = useState<string>("");
+  const [showResponseText, setShowResponseText] = useState(false);
+  const [responseText, setResponseText] = useState("");
 
-  const handleDescriptionChange = (event: any) => {
-    setTaskDescription(event.target.value);
-  };
   const context = useContext(CenterSystemContext);
   const { user } = context;
+
+  const handleDescriptionChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setTaskDescription(event.target.value);
+    setErrorText("Add description to your task");
+  };
+
+  const getResponseText = (status: string) => {
+    switch (status) {
+      case "scheduled":
+        return "Your task is in the front";
+      case "doing":
+        return "Your task is being processed";
+      default:
+        return "Your task is not in the front nor being processed";
+    }
+  };
+
   const createTask = async () => {
     if (taskDescription.length === 0) {
       setErrorText("Please fill out description");
       return;
     }
+
     try {
       if (user) {
         const newTaskDto = new CreateTaskDto(taskDescription, user.id);
@@ -30,18 +45,17 @@ function CreateTask() {
 
         if (response.status === 200) {
           setShowResponseText(true);
-          if (response.data.status === "scheduled") {
-            setResponseText("Your task is in the front ");
-          } else if (response.data.status === "doing") {
-            setResponseText("Your task is being processed ");
-          } else {
-            setResponseText("Your task not int the front nor being processed");
-          }
+          setResponseText(getResponseText(response.data.status));
         }
       }
-    } catch (error: any) {
-      console.error("Server responded with an error:", error.response.data);
-      setErrorText(error.response.data.message);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error("Server responded with an error:", error.response?.data);
+        setErrorText(error.response?.data?.message || "An error occurred");
+      } else {
+        console.error("An unknown error occurred:", error);
+        setErrorText("An unknown error occurred");
+      }
     }
   };
 
@@ -69,11 +83,10 @@ function CreateTask() {
           />
         </div>
       </div>
+
       {!showResponseText && (
         <button
-          onClick={() => {
-            createTask();
-          }}
+          onClick={createTask}
           type="button"
           className="rounded-md my-5 bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
         >

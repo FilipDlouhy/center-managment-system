@@ -29,7 +29,6 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    console.log("Form data submitted:", formData);
 
     e.preventDefault();
     if (!formData.email || !formData.password) {
@@ -37,14 +36,12 @@ export default function LoginPage() {
       return;
     }
     try {
-      console.log(appendToUrl("user/create-user"));
       const response = await axios.post(
         appendToUrl("user/user-login"),
         formData
       );
       if (response.status === 200) {
         const { setUser } = context;
-        console.log(response.data);
         setUser(response.data);
         navigate(
           response.data.admin ? "/admin/admin-page" : "/user/tasks-page"

@@ -11,7 +11,6 @@ function Tasks() {
       try {
         const response = await axios.get(appendToUrl("task/get-all-tasks"));
         if (response.status === 200) {
-          console.log(response.data);
           setTasks(response.data);
         }
       } catch (error) {

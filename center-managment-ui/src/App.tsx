@@ -7,11 +7,10 @@ import {
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import CenterSystemContext from "./context/context";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { UserDto } from "./DTOS/user.dto";
 import UserTaskPage from "./pages/UserTaskPage";
 import { TaskDto } from "./DTOS/task.dto";
-import { io } from "socket.io-client";
 import AdminPage from "./pages/AdminPage";
 import { TaskAdminDto } from "./DTOS/taskAdmin.dto";
 

@@ -1,70 +1,82 @@
 import React, { useContext, useState } from "react";
+import axios, { AxiosError } from "axios";
 import CenterSystemContext from "../../context/context";
 import {
   appendToUrl,
   formatISODate,
   formatISODateWithOffset,
 } from "../../consts/consts";
-import axios from "axios";
+import { TaskDetail } from "./TaskDetail";
 
 function TaskInfo() {
-  const context = useContext(CenterSystemContext);
-  const { task } = context;
-  const { setTask } = context;
-  const [errorText, setErrorText] = useState<string>(" Info about your task");
+  const { task, setTask } = useContext(CenterSystemContext);
+  const [errorText, setErrorText] = useState<string>("Info about your task");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const deleteTask = async () => {
-    if (task?.status === "doing") {
-      setErrorText("You cannot delete a task because he is being processed");
+    if (!task) return;
+    if (task.status === "doing") {
+      setErrorText("You cannot delete a task because it is being processed");
       return;
     }
+    setIsDeleting(true);
     try {
       const response = await axios.get(
-        appendToUrl(`task/delete-task/${task?.id}`)
+        appendToUrl(`task/delete-task/${task.id}`)
       );
       if (response.status === 200) {
         setTask(undefined);
+        setErrorText("Task deleted successfully");
       }
-    } catch (error: any) {
-      console.error("Server responded with an error:", error.response.data);
-      setErrorText(error.response.data.message);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error("Server responded with an error:", error.response?.data);
+        setErrorText(error.response?.data?.message || "An error occurred");
+      } else {
+        console.error("An unknown error occurred:", error);
+        setErrorText("An unknown error occurred");
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
+
+  if (!task) {
+    return <div>No task selected</div>;
+  }
 
   return (
     <div>
       <div className="w-full h-16">
-        <h1 className="text-2xl font-semibold text-black">{errorText}</h1>
+        <h1
+          className={`text-2xl font-semibold ${
+            isDeleting ? "text-gray-400" : "text-black"
+          }`}
+        >
+          {errorText}
+        </h1>
       </div>
 
       <div className="w-full flex items-start h-96">
-        <div className="w-40 h-28 m-5 shadow-2xl flex flex-col items-center justify-around">
-          <h1 className="font-bold text-xl">Status</h1>
-          <h1>{task?.status}</h1>
-        </div>
-
-        <div className="w-64 h-28 m-5 shadow-2xl flex flex-col items-center justify-around">
-          <h1 className="font-bold text-xl">Description</h1>
-          <h1>{task?.description}</h1>
-        </div>
-
-        <div className="w-48 h-28 m-5 shadow-2xl flex flex-col items-center justify-around">
-          <h1 className="font-bold text-xl">Created at</h1>
-          <h1>{formatISODate(task?.createdAt)}</h1>
-        </div>
-
-        <div className="w-56 h-28 m-5 shadow-2xl flex flex-col items-center justify-around">
-          <h1 className="font-bold text-xl">Will be proccesed at</h1>
-          <h1>{formatISODateWithOffset(task?.createdAt, task?.processedAt)}</h1>
-        </div>
+        <TaskDetail title="Status" detail={task.status} />
+        <TaskDetail title="Description" detail={task.description} />
+        <TaskDetail title="Created at" detail={formatISODate(task.createdAt)} />
+        <TaskDetail
+          title="Will be processed at"
+          detail={formatISODateWithOffset(task.createdAt, task.processedAt)}
+        />
       </div>
+
       <div className="h-64 flex items-center justify-center w-full">
         <button
-          onClick={() => {
-            deleteTask();
-          }}
+          onClick={deleteTask}
           type="button"
-          className="rounded-md my-5 w-48 h-14 bg-indigo-600 px-3.5 py-2.5  font-semibold text-2xl text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          disabled={task.status === "doing"}
+          className={`rounded-md my-5 w-48 h-14 bg-indigo-600 px-3.5 py-2.5 font-semibold text-2xl text-white shadow-sm ${
+            task.status === "doing"
+              ? "opacity-50 cursor-not-allowed"
+              : "hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          }`}
         >
           Delete task
         </button>

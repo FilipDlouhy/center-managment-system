@@ -62,12 +62,11 @@ export class TasksService implements OnModuleInit {
         user = await this.userClient
           .send(USER_MESSAGES.getUserForTask, { userId: createTaskDto.userId })
           .toPromise();
-        console.log(user);
       } catch (error) {
         throw new Error('Error retrieving user');
       }
 
-      if (user.tasks.length >= 80) {
+      if (user.tasks.length >= 60) {
         throw new Error('User has too many tasks');
       }
 
@@ -240,7 +239,7 @@ export class TasksService implements OnModuleInit {
       }
 
       if (!task) {
-        throw new NotFoundException('User not found');
+        throw new NotFoundException('Task not found');
       }
 
       return task;
@@ -418,7 +417,6 @@ export class TasksService implements OnModuleInit {
       });
 
       if (!updatedTask) {
-        console.log(`No scheduled task found for front ID: ${frontId}`);
         return null;
       }
 
@@ -438,7 +436,6 @@ export class TasksService implements OnModuleInit {
         frontId,
       );
       newTaskToDo.userId = updatedTask.user.id;
-      console.log('New Task to Do:', newTaskToDo);
 
       await this.sendMessageToCenter(center_id, newTaskToDo);
       await this.taskRepository.save(updatedTask);
@@ -532,7 +529,6 @@ export class TasksService implements OnModuleInit {
       });
 
       if (!taskTodo) {
-        console.log('No task found with the specified criteria.');
         return;
       }
 
@@ -651,7 +647,6 @@ export class TasksService implements OnModuleInit {
    * @param messageObject - The JSON message object to send.
    */
   private async sendMessageToCenter(centerId: string, messageObject: any) {
-    console.log('ASFASF');
     try {
       const queue = `${centerId}_queue`;
       const message = JSON.stringify(messageObject);
