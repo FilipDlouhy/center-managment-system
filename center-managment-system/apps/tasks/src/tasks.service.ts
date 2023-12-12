@@ -22,6 +22,7 @@ import { taskStatus } from '@app/database/dtos/tasksDtos/taskStatus';
 import { UpdateTaskStateDTO } from '@app/database/dtos/tasksDtos/updateTaskState.dto';
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { TaskToDoDTO } from '@app/database/dtos/tasksDtos/taskToDo.dto';
+import { maximumUsersTasks } from '@app/database/length.constant';
 
 @Injectable()
 export class TasksService implements OnModuleInit {
@@ -66,7 +67,7 @@ export class TasksService implements OnModuleInit {
         throw new Error('Error retrieving user');
       }
 
-      if (user.tasks.length >= 60) {
+      if (user.tasks.length >= maximumUsersTasks) {
         throw new Error('User has too many tasks');
       }
 

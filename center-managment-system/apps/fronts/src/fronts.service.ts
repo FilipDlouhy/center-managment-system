@@ -3,7 +3,6 @@ import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUp
 import { UpdateLengthDTO } from '@app/database/dtos/frontDtos/updateLength.dto';
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { Front } from '@app/database/entities/front.entity';
-import { frontLength } from '@app/database/front.length.constant';
 import { TASK_MESSAGES, TASK_QUEUE } from '@app/rmq/rmq.task.constants';
 import {
   BadRequestException,
@@ -14,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
+import { frontLength } from '@app/database/length.constant';
 import { EntityManager, Repository } from 'typeorm';
 
 @Injectable()

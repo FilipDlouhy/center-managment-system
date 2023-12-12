@@ -1,5 +1,5 @@
 import React, { useEffect, useState, ChangeEvent } from "react";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { CenterDto } from "../../DTOS/center.dto";
 import Center from "./Center";
 import Task from "../Task";
@@ -9,6 +9,7 @@ function Centers() {
   const [centers, setCenters] = useState<CenterDto[]>([]);
   const [center, setCenter] = useState<CenterDto | undefined>(undefined);
   const [inputValue, setInputValue] = useState("");
+  const [frontLengthInput, setFrontLengthInput] = useState("");
   const [errorText, setErrorText] = useState("");
 
   useEffect(() => {
@@ -34,6 +35,10 @@ function Centers() {
     setInputValue(e.target.value);
   };
 
+  const handleFrontLengthChange = (event: ChangeEvent<HTMLInputElement>) => {
+    // Update the state with the input's value
+    setFrontLengthInput(event.target.value);
+  };
   const createCenter = async () => {
     if (!inputValue.trim()) {
       setErrorText("Please enter a valid center name");
@@ -80,6 +85,27 @@ function Centers() {
     }
   };
 
+  const updateFrontLength = async () => {
+    try {
+      const response = await axios.post(
+        appendToUrl(`front/update-front-length`),
+        {
+          maximumFrontLength: frontLengthInput,
+        }
+      );
+
+      if (response.status === 200) {
+        setFrontLengthInput("");
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setErrorText(error.response?.data?.message || "An error occurred");
+      } else {
+        setErrorText("An unknown error occurred");
+      }
+    }
+  };
+
   return (
     <div>
       <div className="w-full h-28">
@@ -107,6 +133,21 @@ function Centers() {
                 className="flex h-9 w-72 justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               >
                 Create center
+              </button>
+            </div>
+
+            <div className="w-full h-20 flex">
+              <input
+                className="w-64 mx-4 h-9 bg-slate-300"
+                type="number"
+                value={frontLengthInput}
+                onChange={handleFrontLengthChange}
+              />
+              <button
+                onClick={updateFrontLength}
+                className="flex h-9 w-72 justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              >
+                Update length of fronts
               </button>
             </div>
             <h1 className="text-2xl font-extrabold text-red-800">

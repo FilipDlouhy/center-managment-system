@@ -24,7 +24,7 @@ function Users() {
   }, []);
   return (
     <div>
-      <h1 className="font-bold text-2xl">
+      <h1 className="font-bold text-2xl ">
         {userToShow ? "User detail" : "All users in the system"}
       </h1>
       {!userToShow && (
@@ -46,12 +46,17 @@ function Users() {
         <div>
           <p>{userToShow.email}</p>
           <p>{userToShow?.name}</p>
-          {userToShow.tasks?.map((task) => {
-            return (
-              <Task description={task.description} id={task.id} key={task.id} />
-            );
-          })}
-
+          <div className="flex flex-wrap">
+            {userToShow.tasks?.map((task) => {
+              return (
+                <Task
+                  description={task.description}
+                  id={task.id}
+                  key={task.id}
+                />
+              );
+            })}
+          </div>
           <div className="w-full mt-10 h-20">
             <button
               onClick={() => {
