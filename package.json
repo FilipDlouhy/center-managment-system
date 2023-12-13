@@ -1,0 +1,18 @@
+{
+  "name": "your-project",
+  "version": "1.0.0",
+  "scripts": {
+    "app": "npm install concurrently --save-dev && npm run start-docker && npm run setup-ui && npm run setup-backend &&  npm run typeorm-migrate && npm run start-apps  ",
+    "dev": "npm run start-docker && npm run start-ui && npm run start-backend",
+    "start-docker": "docker-compose up -d",
+    "setup-ui": "cd center-managment-ui && npm install",
+    "setup-backend": "cd center-managment-system && npm install",
+    "start-apps": "concurrently \"npm run start-ui\" \"npm run start-backend\"",
+    "typeorm-migrate": "cd center-managment-system && npm run typeorm:run-migrations",
+    "start-ui": "cd center-managment-ui && npm run start",
+    "start-backend": "cd center-managment-system && npm run start:dev:all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

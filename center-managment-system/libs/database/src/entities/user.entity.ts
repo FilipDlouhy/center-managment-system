@@ -1,12 +1,5 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToMany,
-  ManyToOne,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Task } from './task.entity';
-import { Center } from './center.entity';
 
 @Entity()
 export class User {
