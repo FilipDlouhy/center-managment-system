@@ -7,10 +7,10 @@ import { Task } from './entities/task.entity';
 
 export const databaseConfig: TypeOrmModuleOptions = {
   type: 'mysql',
-  host: 'localhost',
+  host: 'mysql',
   port: 3306,
-  username: 'user',
-  password: 'password',
+  username: 'root',
+  password: 'rootpassword',
   database: 'mydb',
   entities: [Front, User, Center, Task],
   synchronize: true,

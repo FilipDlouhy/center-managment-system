@@ -1,6 +1,6 @@
 export const TASK_QUEUE = {
   queueName: 'task_service_queue',
-  url: 'amqp://guest:guest@localhost:5672',
+  url: 'amqp://guest:guest@rabbitmq:5672',
   serviceName: 'task_service',
 };
 export const TASK_MESSAGES = {
@@ -16,6 +16,7 @@ export const TASK_MESSAGES = {
   deleteFrontFromTasks: 'task.deleteFrontFromTasks',
   deleteTasksWithoutUser: 'task.deleteTasks',
   sendTaskToDoAfterRestart: 'task.sendTaskToDoAfterRestart',
-  getUsersTasks: 'users.getUsersTasks',
-  getUsersTasksCurrent: 'users.getUsersTasksCurrent',
+  getUsersTasks: 'task.getUsersTasks',
+  getUsersTasksCurrent: 'task.getUsersTasksCurrent',
+  fillTheCenter: 'task.fillTheCenter',
 };

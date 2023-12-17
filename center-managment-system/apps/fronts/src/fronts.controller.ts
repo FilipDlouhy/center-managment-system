@@ -107,4 +107,18 @@ export class FrontsController {
       throw new RpcException(error.message);
     }
   }
+
+  // Updates time that all tasks take to complete
+  @MessagePattern(FRONT_MESSAGES.updateTimeToCompleteAllTasks)
+  async updateTimeToCompleteAllTasks(
+    @Payload() updateFrontTimeDto: FrontUpdateTimeAndTasksDTO,
+  ): Promise<boolean> {
+    try {
+      return await this.frontsService.updateFrontTimeToCompleteAllTasks(
+        updateFrontTimeDto,
+      );
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
+  }
 }

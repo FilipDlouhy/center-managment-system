@@ -37,6 +37,7 @@ export class UsersService {
       userDto.password = await bcrypt.hash(userDto.password, 10);
       const user = new User(userDto);
       await this.entityManager.save(user);
+      delete user.password;
       return user;
     } catch (error) {
       if (error instanceof QueryFailedError) {
@@ -204,7 +205,6 @@ export class UsersService {
     try {
       const user = await this.userRepository.findOne({
         where: { email: loginUserDto.email },
-        relations: { tasks: true },
         select: ['id', 'name', 'email', 'admin', 'password'],
       });
 
@@ -218,6 +218,7 @@ export class UsersService {
       );
 
       if (passwordMatchResult) {
+        delete user.password;
         return user;
       } else {
         throw new InternalServerErrorException('Wrong password');

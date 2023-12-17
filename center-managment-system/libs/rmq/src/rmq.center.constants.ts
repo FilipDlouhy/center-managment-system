@@ -1,6 +1,6 @@
 export const CENTER_QUEUE = {
   queueName: 'center_service_queue',
-  url: 'amqp://guest:guest@localhost:5672',
+  url: 'amqp://guest:guest@rabbitmq:5672',
   serviceName: 'center_service',
 };
 export const CENTER_MESSAGES = {

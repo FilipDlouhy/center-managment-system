@@ -5,7 +5,6 @@ function generateRandomId() {
 }
 
 function transformToCamelCase(url) {
-  // Rozdělí URL na části podle '/'
   const parts = url.split('/');
   const cammelCasedString = kebabToCamel(parts[2]);
   let number = null;

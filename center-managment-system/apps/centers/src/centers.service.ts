@@ -20,6 +20,8 @@ import { UpdateTaskStateDTO } from '@app/database/dtos/tasksDtos/updateTaskState
 import { taskStatus } from '@app/database/dtos/tasksDtos/taskStatus';
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { FrontUpdateTimeAndTasksDTO } from '@app/database/dtos/frontDtos/frontUpdateTimeAndTasks.dto';
+import { FillCenterDto } from '@app/database/dtos/centerDtos/fillCenter.dto';
+import { frontLength } from '@app/database/length.constant';
 @Injectable()
 export class CentersService implements OnModuleInit {
   constructor(
@@ -37,7 +39,7 @@ export class CentersService implements OnModuleInit {
   private channel: amqp.Channel;
   private exchange = 'center_exchange';
   async onModuleInit() {
-    this.connection = await amqp.connect('amqp://localhost:5672');
+    this.connection = await amqp.connect('amqp://guest:guest@rabbitmq:5672');
     this.channel = await this.connection.createChannel();
 
     const centers = await this.getCenters();
@@ -103,54 +105,12 @@ export class CentersService implements OnModuleInit {
       console.log(`Received message from ${queueName}:`, messageContent);
 
       // Process the message after a delay based on 'processedAt' time
-      const establishWsTimeout = setTimeout(async () => {
+      const consumeTheMessageTimeOut = setTimeout(async () => {
         try {
-          // Update task state to DONE using the data received in the message
-          const taskUpdateDto = new UpdateTaskStateDTO(
-            messageContent.id,
-            taskStatus.DONE,
-            messageContent.frontId,
-          );
-          await this.taskClient
-            .send(TASK_MESSAGES.updateTaskState, taskUpdateDto)
-            .toPromise();
-
-          // Update the length of tasks in the front specified in the message
-          const frontUpdateDto = new FrontUpdateTimeAndTasksDTO(
-            messageContent.frontId,
-            messageContent.processedAt,
-          );
-          await this.frontClient
-            .send(FRONT_MESSAGES.deleteFrontTaskLength, frontUpdateDto)
-            .toPromise();
-
-          // Handle selecting the best task for the front
-          const bestTaskForFront = await this.taskClient
-            .send(TASK_MESSAGES.getBestTaskForFront, {})
-            .toPromise();
-
-          // If a best task is found, schedule it for the front
-          if (bestTaskForFront != null) {
-            const taskToFrontDto = new AddTaskToFrontDTO(
-              bestTaskForFront.id,
-              taskStatus.SCHEDULED,
-              bestTaskForFront.processedAt,
-              messageContent.frontId,
-            );
-            await this.frontClient
-              .send(FRONT_MESSAGES.addBestTaskToFront, taskToFrontDto)
-              .toPromise();
-            await this.taskClient
-              .send(TASK_MESSAGES.addFrontToTask, taskToFrontDto)
-              .toPromise();
-          }
-
-          // Find the next task to do in the specified front
-          await this.taskClient
-            .send(TASK_MESSAGES.findNextTaskToDoInFront, {
-              frontId: messageContent.frontId,
-            })
-            .toPromise();
+          await this.updateTaskStateToDone(messageContent);
+          await this.updateFrontTaskLength(messageContent);
+          await this.scheduleBestTaskForFront(messageContent);
+          await this.findNextTaskToDoInFront(messageContent);
         } catch (error) {
           console.error('Error processing message from center:', error);
         }
@@ -159,7 +119,7 @@ export class CentersService implements OnModuleInit {
       // Add the task processing to the scheduler registry
       this.schedulerRegistry.addTimeout(
         `${messageContent.id}_establish_ws`,
-        establishWsTimeout,
+        consumeTheMessageTimeOut,
       );
 
       // Acknowledge the message so it is not sent again
@@ -186,7 +146,10 @@ export class CentersService implements OnModuleInit {
 
       const center = new Center({ ...centerDto, front });
       const savedCenter = await this.entityManager.save(center);
-      this.setupQueueForCenter(savedCenter.id.toString());
+      await this.setupQueueForCenter(savedCenter.id.toString());
+
+      this.fillCenterWithTasks(savedCenter, frontLength, front.id);
+
       return savedCenter;
     } catch (error) {
       console.error(error);
@@ -294,7 +257,6 @@ export class CentersService implements OnModuleInit {
         throw new BadRequestException('Invalid center ID');
       }
 
-      // Find the center in the database along with related entities
       const updatedCenter = await this.entityManager.transaction(
         async (transactionalEntityManager) => {
           const center = await this.centerRepository.findOne({
@@ -302,17 +264,14 @@ export class CentersService implements OnModuleInit {
             relations: ['front', 'front.tasks'],
           });
 
-          // Check if the center exists
           if (!center) {
             throw new NotFoundException('Center not found');
           }
 
-          // Update the center's name if provided
           if (updateCenterDto.name && updateCenterDto.name.length > 0) {
             center.name = updateCenterDto.name;
           }
 
-          // Save the updated center
           await transactionalEntityManager.save(center);
 
           return center;
@@ -340,9 +299,102 @@ export class CentersService implements OnModuleInit {
       .createQueryBuilder('center')
       .leftJoinAndSelect('center.front', 'front')
       .where('front.id = :frontId', { frontId })
-      .select(['center.id']) // Select only the centerId
-      .getRawOne(); // Use getRawOne to get a plain object
+      .select(['center.id'])
+      .getRawOne();
 
     return center;
+  }
+
+  /**
+   * Update the task state to 'DONE' and send a message to the task client.
+   * @param messageContent DTO containing task information.
+   */
+  private async updateTaskStateToDone(messageContent: any) {
+    const taskUpdateDto = new UpdateTaskStateDTO(
+      messageContent.id,
+      taskStatus.DONE,
+      messageContent.frontId,
+    );
+    await this.taskClient
+      .send(TASK_MESSAGES.updateTaskState, taskUpdateDto)
+      .toPromise();
+  }
+
+  /**
+   * Update the front task length and send a message to the front client.
+   * @param messageContent DTO containing front task information.
+   */
+  private async updateFrontTaskLength(messageContent: any) {
+    const frontUpdateDto = new FrontUpdateTimeAndTasksDTO(
+      messageContent.frontId,
+      messageContent.processedAt,
+    );
+    await this.frontClient
+      .send(FRONT_MESSAGES.deleteFrontTaskLength, frontUpdateDto)
+      .toPromise();
+  }
+
+  /**
+   * Schedule the best task for a front.
+   * @param messageContent DTO containing front and task information.
+   */
+  private async scheduleBestTaskForFront(messageContent: any) {
+    const bestTaskForFront = await this.taskClient
+      .send(TASK_MESSAGES.getBestTaskForFront, {})
+      .toPromise();
+    if (bestTaskForFront != null) {
+      const taskToFrontDto = new AddTaskToFrontDTO(
+        bestTaskForFront.id,
+        taskStatus.SCHEDULED,
+        bestTaskForFront.processedAt,
+        messageContent.frontId,
+      );
+      await this.frontClient
+        .send(FRONT_MESSAGES.addBestTaskToFront, taskToFrontDto)
+        .toPromise();
+      await this.taskClient
+        .send(TASK_MESSAGES.addFrontToTask, taskToFrontDto)
+        .toPromise();
+    }
+  }
+
+  /**
+   * Find the next task to do in a front.
+   * @param messageContent DTO containing front information.
+   */
+  private async findNextTaskToDoInFront(messageContent: any) {
+    await this.taskClient
+      .send(TASK_MESSAGES.findNextTaskToDoInFront, {
+        frontId: messageContent.frontId,
+      })
+      .toPromise();
+  }
+
+  /**
+   * Fill the center with tasks for a specific front.
+   * @param savedCenter The ID of the center to fill.
+   * @param frontLength The length of the front.
+   * @param frontId The ID of the front.
+   */
+  private async fillCenterWithTasks(
+    savedCenter: Center,
+    frontLength: number,
+    frontId: number,
+  ) {
+    const fillCenterDto = new FillCenterDto(
+      savedCenter.id,
+      frontLength,
+      frontId,
+      true,
+    );
+
+    try {
+      await this.taskClient
+        .send(TASK_MESSAGES.fillTheCenter, fillCenterDto)
+        .toPromise();
+    } catch (error) {
+      console.error('Error while filling the center with tasks:', error);
+      throw error;
+    }
   }
 }

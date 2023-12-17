@@ -23,6 +23,7 @@ import { UpdateTaskStateDTO } from '@app/database/dtos/tasksDtos/updateTaskState
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { TaskToDoDTO } from '@app/database/dtos/tasksDtos/taskToDo.dto';
 import { maximumUsersTasks } from '@app/database/length.constant';
+import { FillCenterDto } from '@app/database/dtos/centerDtos/fillCenter.dto';
 
 @Injectable()
 export class TasksService implements OnModuleInit {
@@ -38,7 +39,7 @@ export class TasksService implements OnModuleInit {
     private readonly centerClient: ClientProxy,
   ) {}
   async onModuleInit() {
-    const connection = await amqp.connect('amqp://localhost:5672');
+    const connection = await amqp.connect('amqp://guest:guest@rabbitmq:5672');
     this.channel = await connection.createChannel();
   }
 
@@ -54,10 +55,8 @@ export class TasksService implements OnModuleInit {
    */
   async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
     try {
-      // Generate random time for task completion
       const timeToCompleteTask = this.generateRandomTime(1);
 
-      // Retrieve User
       let user: User;
       try {
         user = await this.userClient
@@ -81,78 +80,26 @@ export class TasksService implements OnModuleInit {
       }
 
       if (!front) {
-        throw new Error('Front not found');
-      }
-
-      if (front.taskTotal + 1 > front.maxTasks) {
-        const newTaskDto = new CreateTaskDto(
+        return this.createUnscheduledTask(
           createTaskDto,
-          null,
-          timeToCompleteTask,
-          taskStatus.UNSCHEDULED,
-        );
-
-        const newTask = this.taskRepository.create({
-          ...newTaskDto,
           user,
-          whenAddedToTheFront: null,
-        });
-        await this.taskRepository.save(newTask);
-        return newTask;
-      } else {
-        const updateFrontTaskLengthAndTimeDto = new FrontUpdateTimeAndTasksDTO(
-          front.id,
           timeToCompleteTask,
         );
-
-        let wasFrontUpdated: boolean;
-        try {
-          wasFrontUpdated = await this.frontClient
-            .send(
-              FRONT_MESSAGES.addFrontTasksLength,
-              updateFrontTaskLengthAndTimeDto,
-            )
-            .toPromise();
-        } catch (error) {
-          throw new Error('Error updating front');
-        }
-
-        if (wasFrontUpdated) {
-          try {
-            user = await this.userClient
-              .send(USER_MESSAGES.getUserForTask, {
-                userId: createTaskDto.userId,
-              })
-              .toPromise();
-          } catch (error) {
-            throw new Error('Error re-fetching user');
-          }
-
-          // Create and save new Task
-          const newTaskDto = new CreateTaskDto(
+      } else {
+        if (front.taskTotal === 0) {
+          return this.sendFirstTaskToDo(
             createTaskDto,
-            front.id,
-            timeToCompleteTask,
-            taskStatus.SCHEDULED,
-          );
-
-          const newTask = this.taskRepository.create({
-            ...newTaskDto,
-            front,
             user,
-            whenAddedToTheFront: new Date(),
-          });
-
-          if (front.taskTotal === 0) {
-            newTask.status = taskStatus.DOING;
-            const frontId = front.id;
-            const { center_id } = await this.centerClient
-              .send(CENTER_MESSAGES.getCeterWithFrontId, { frontId })
-              .toPromise();
-            await this.sendMessageToCenter(center_id, newTaskDto);
-          }
-
-          return await this.taskRepository.save(newTask);
+            front,
+            timeToCompleteTask,
+          );
+        } else {
+          return this.createScheduledTask(
+            createTaskDto,
+            user,
+            front,
+            timeToCompleteTask,
+          );
         }
       }
     } catch (error) {
@@ -160,7 +107,6 @@ export class TasksService implements OnModuleInit {
       throw error;
     }
   }
-
   /**
    * Deletes a task by its ID.
    * @param id The ID of the task to be deleted.
@@ -213,42 +159,32 @@ export class TasksService implements OnModuleInit {
   /**
    * Retrieves a specific task by its ID.
    * @param id The ID of the task to retrieve.
+   * @param includeUser Indicates whether to include the user information in the response.
    * @returns The requested task entity.
-   * @throws NotFoundException If the task is not found.
    * @throws BadRequestException If the provided ID is invalid.
+   * @throws NotFoundException If the task is not found.
    * @throws InternalServerErrorException For any other unexpected errors.
    */
-  async getTask(id: number, user: boolean): Promise<Task> {
-    try {
-      if (isNaN(id) || id <= 0) {
-        throw new BadRequestException('Invalid user ID');
-      }
-
-      let task: Task;
-      if (user) {
-        task = await this.taskRepository.findOne({
-          where: { id },
-          relations: { front: false, user: false },
-          select: ['id', 'processedAt', 'createdAt', 'status', 'description'],
-        });
-      } else {
-        task = await this.taskRepository.findOne({
-          where: { id },
-          relations: { front: true, user: true },
-          select: ['id', 'processedAt', 'createdAt', 'status', 'description'],
-        });
-      }
-
-      if (!task) {
-        throw new NotFoundException('Task not found');
-      }
-
-      return task;
-    } catch (error) {
-      console.error('Error while finding user:', error);
-
-      throw new InternalServerErrorException('Error while finding user');
+  async getTask(id: number, includeUser: boolean): Promise<Task> {
+    if (isNaN(id) || id <= 0) {
+      throw new BadRequestException('Invalid task ID');
     }
+    const task = await this.taskRepository.findOne({
+      where: { id },
+      relations: includeUser
+        ? { front: true, user: true }
+        : { front: true, user: false },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (task.front) {
+      task.processedAt = await this.calculateProcessedTime(task);
+    }
+
+    return task;
   }
 
   /**
@@ -400,7 +336,6 @@ export class TasksService implements OnModuleInit {
    * @throws InternalServerErrorException For any other unexpected errors.
    */
   async findNextTaskToDoInFront(frontId: number): Promise<Task | null> {
-    // Validate input
     if (!frontId) {
       throw new BadRequestException('Invalid front ID');
     }
@@ -533,10 +468,11 @@ export class TasksService implements OnModuleInit {
         return;
       }
 
-      const taskTodoCreatedAt = new Date(taskTodo.createdAt).getTime();
-
+      const whenAddedToTheFront = new Date(
+        taskTodo.whenAddedToTheFront,
+      ).getTime();
       const currentTime = new Date().getTime();
-      const millisecondsDifference = currentTime - taskTodoCreatedAt;
+      const millisecondsDifference = currentTime - whenAddedToTheFront;
 
       const newTaskToDo = new TaskToDoDTO(
         taskTodo.id,
@@ -549,6 +485,19 @@ export class TasksService implements OnModuleInit {
       );
 
       taskTodo.processedAt = taskTodo.processedAt + millisecondsDifference;
+
+      const updateFrontTimeDto = new FrontUpdateTimeAndTasksDTO(
+        frontId,
+        millisecondsDifference,
+      );
+
+      const wasFrontUpdated = await this.frontClient
+        .send(FRONT_MESSAGES.updateTimeToCompleteAllTasks, updateFrontTimeDto)
+        .toPromise();
+
+      if (!wasFrontUpdated) {
+        throw new Error('Failed to update the front with the new time.');
+      }
 
       await this.taskRepository.save(taskTodo);
 
@@ -598,7 +547,6 @@ export class TasksService implements OnModuleInit {
    */
   async getUsersTasksCurrent(userId: number) {
     try {
-      // Find tasks for the user with the specified userId
       const usersTasks = await this.taskRepository.find({
         where: {
           user: { id: userId },
@@ -608,7 +556,6 @@ export class TasksService implements OnModuleInit {
       });
 
       if (!usersTasks) {
-        // Throw NotFoundException if the user's tasks are not found
         throw new NotFoundException(
           `Tasks for user with ID ${userId} not found.`,
         );
@@ -616,13 +563,63 @@ export class TasksService implements OnModuleInit {
 
       return usersTasks;
     } catch (error) {
-      // Handle exceptions here
       throw new InternalServerErrorException(
         'An error occurred while fetching user tasks.',
       );
     }
   }
 
+  /**
+   * Fills the center with tasks from the repository.
+   * Retrieves unscheduled tasks and adds them to a center, handling new centers differently.
+   * @param {FillCenterDto} fillCenterDto - DTO containing information to fill the center.
+   */
+  async fillTheCenter(fillCenterDto: FillCenterDto): Promise<void> {
+    try {
+      const fillerTasks = await this.taskRepository.find({
+        where: { status: taskStatus.UNSCHEDULED, whenAddedToTheFront: null },
+        take: fillCenterDto.numberOfTasksToFill,
+        relations: { user: true },
+      });
+
+      for (const [index, task] of fillerTasks.entries()) {
+        const status =
+          fillCenterDto.isCenterNew && index === 0
+            ? taskStatus.DOING
+            : taskStatus.SCHEDULED;
+        const taskToFrontDto = new AddTaskToFrontDTO(
+          task.id,
+          status,
+          task.processedAt,
+          fillCenterDto.frontId,
+        );
+
+        await this.frontClient
+          .send(FRONT_MESSAGES.addBestTaskToFront, taskToFrontDto)
+          .toPromise();
+        await this.addFrontToTask(taskToFrontDto);
+
+        if (fillCenterDto.isCenterNew && index === 0) {
+          const newTaskToDo = new TaskToDoDTO(
+            task.id,
+            task.description,
+            task.status,
+            task.createdAt,
+            task.processedAt,
+            task.user.id,
+            fillCenterDto.frontId,
+          );
+
+          this.sendMessageToCenter(
+            fillCenterDto.centerId.toString(),
+            newTaskToDo,
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error in fillTheCenter:', error);
+    }
+  }
   /**
    * Generates a random time interval based on the provided number.
    */
@@ -660,5 +657,158 @@ export class TasksService implements OnModuleInit {
     } catch (error) {
       console.error(`Error sending message to center ${centerId}:`, error);
     }
+  }
+
+  /**
+   * Calculate the total processed time for a task, including its previous tasks in the same front.
+   * @param task The task for which to calculate the processed time.
+   * @returns The total processed time for the task.
+   */
+  private async calculateProcessedTime(task: Task): Promise<number> {
+    const tasksBefore = await this.taskRepository.find({
+      where: {
+        front: { id: task.front.id },
+      },
+      select: ['processedAt', 'whenAddedToTheFront'],
+    });
+
+    let timeToAdd = task.processedAt;
+
+    tasksBefore.forEach((taskBefore) => {
+      if (taskBefore.whenAddedToTheFront < task.whenAddedToTheFront) {
+        timeToAdd += taskBefore.processedAt;
+      }
+    });
+
+    return timeToAdd;
+  }
+
+  /**
+   * Create a new unscheduled task.
+   * @param createTaskDto Data Transfer Object for task creation.
+   * @param user The user associated with the task.
+   * @param timeToCompleteTask The time required to complete the task.
+   * @returns The created unscheduled task entity.
+   */
+  private async createUnscheduledTask(
+    createTaskDto: CreateTaskDto,
+    user: User,
+    timeToCompleteTask: number,
+  ): Promise<Task> {
+    const newTaskDto = new CreateTaskDto(
+      createTaskDto,
+      null,
+      timeToCompleteTask,
+      taskStatus.UNSCHEDULED,
+    );
+    const newTask = this.taskRepository.create({ ...newTaskDto, user });
+    return await this.taskRepository.save(newTask);
+  }
+
+  /**
+   * Create a new scheduled task and update the associated front's task length and time.
+   * @param createTaskDto Data Transfer Object for task creation.
+   * @param user The user associated with the task.
+   * @param front The front associated with the task.
+   * @param timeToCompleteTask The time required to complete the task.
+   * @returns The created scheduled task entity.
+   * @throws Error If there is an error updating the front or the front update fails.
+   */
+  private async createScheduledTask(
+    createTaskDto: CreateTaskDto,
+    user: User,
+    front: Front,
+    timeToCompleteTask: number,
+  ): Promise<Task> {
+    let wasFrontUpdated: boolean;
+    try {
+      const updateFrontTaskLengthAndTimeDto = new FrontUpdateTimeAndTasksDTO(
+        front.id,
+        timeToCompleteTask,
+      );
+      wasFrontUpdated = await this.frontClient
+        .send(
+          FRONT_MESSAGES.addFrontTasksLength,
+          updateFrontTaskLengthAndTimeDto,
+        )
+        .toPromise();
+    } catch (error) {
+      throw new Error('Error updating front');
+    }
+
+    if (!wasFrontUpdated) {
+      throw new Error('Failed to update the front');
+    }
+
+    const newTaskDto = new CreateTaskDto(
+      createTaskDto,
+      front.id,
+      timeToCompleteTask,
+      taskStatus.SCHEDULED,
+    );
+
+    const newTask = this.taskRepository.create({
+      ...newTaskDto,
+      user,
+      front,
+      whenAddedToTheFront: new Date(),
+    });
+
+    return await this.taskRepository.save(newTask);
+  }
+
+  async sendFirstTaskToDo(
+    createTaskDto: CreateTaskDto,
+    user: User,
+    front: Front,
+    timeToCompleteTask: number,
+  ) {
+    let wasFrontUpdated: boolean;
+    try {
+      const updateFrontTaskLengthAndTimeDto = new FrontUpdateTimeAndTasksDTO(
+        front.id,
+        timeToCompleteTask,
+      );
+      wasFrontUpdated = await this.frontClient
+        .send(
+          FRONT_MESSAGES.addFrontTasksLength,
+          updateFrontTaskLengthAndTimeDto,
+        )
+        .toPromise();
+    } catch (error) {
+      throw new Error('Error updating front');
+    }
+
+    if (!wasFrontUpdated) {
+      throw new Error('Failed to update the front');
+    }
+
+    const newTaskDto = new CreateTaskDto(
+      createTaskDto,
+      front.id,
+      timeToCompleteTask,
+      taskStatus.DOING,
+    );
+    const newTask = this.taskRepository.create({
+      ...newTaskDto,
+      user,
+      front,
+      whenAddedToTheFront: new Date(),
+    });
+    const newTaskToDo = new TaskToDoDTO(
+      newTask.id,
+      newTask.description,
+      newTask.status,
+      newTask.createdAt,
+      newTask.processedAt,
+      newTask.user.id,
+      front.id,
+    );
+    newTaskToDo.userId = newTask.user.id;
+    const { center_id } = await this.centerClient
+      .send(CENTER_MESSAGES.getCeterWithFrontId, { frontId: front.id })
+      .toPromise();
+    await this.sendMessageToCenter(center_id, newTaskToDo);
+    return await this.taskRepository.save(newTask);
   }
 }

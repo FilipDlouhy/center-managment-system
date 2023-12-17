@@ -6,6 +6,7 @@ import { CreateTaskDto } from '@app/database/dtos/tasksDtos/createTask.dto';
 import { UpdateTaskStateDTO } from '@app/database/dtos/tasksDtos/updateTaskState.dto';
 import { AddTaskToFrontDTO } from '@app/database/dtos/tasksDtos/addTaskToFront.dto';
 import { Task } from '@app/database/entities/task.entity';
+import { FillCenterDto } from '@app/database/dtos/centerDtos/fillCenter.dto';
 
 @Controller()
 export class TasksController {
@@ -45,7 +46,7 @@ export class TasksController {
   @MessagePattern(TASK_MESSAGES.getTaskUser)
   async getTaskUser(id: number): Promise<Task> {
     try {
-      return await this.tasksService.getTask(id, true);
+      return await this.tasksService.getTask(id, false);
     } catch (error) {
       throw new RpcException(error.message);
     }
@@ -55,7 +56,7 @@ export class TasksController {
   @MessagePattern(TASK_MESSAGES.getTaskAdmin)
   async getTaskAdmin(id: number): Promise<Task> {
     try {
-      return await this.tasksService.getTask(id, false);
+      return await this.tasksService.getTask(id, true);
     } catch (error) {
       throw new RpcException(error.message);
     }
@@ -158,7 +159,7 @@ export class TasksController {
 
   // get users tasks
   @MessagePattern(TASK_MESSAGES.getUsersTasks)
-  async getUsersTasks({ userId }: { userId: number }): Promise<Task[]> {
+  async getUsersTasks(userId: number): Promise<Task[]> {
     try {
       return await this.tasksService.getUsersTasks(userId);
     } catch (error) {
@@ -168,9 +169,19 @@ export class TasksController {
 
   // get users tasks wchich are being done
   @MessagePattern(TASK_MESSAGES.getUsersTasksCurrent)
-  async getUsersTasksCurrent({ userId }: { userId: number }): Promise<Task[]> {
+  async getUsersTasksCurrent(userId: number): Promise<Task[]> {
     try {
       return await this.tasksService.getUsersTasksCurrent(userId);
+    } catch (error) {
+      throw new RpcException(error.message);
+    }
+  }
+
+  // get tasks to fill the newly created center
+  @MessagePattern(TASK_MESSAGES.fillTheCenter)
+  async fillTheCenter(fillCenterDto: FillCenterDto): Promise<void> {
+    try {
+      await this.tasksService.fillTheCenter(fillCenterDto);
     } catch (error) {
       throw new RpcException(error.message);
     }

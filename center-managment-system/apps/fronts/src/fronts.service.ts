@@ -14,7 +14,7 @@ import {
 import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { frontLength } from '@app/database/length.constant';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository, Not } from 'typeorm';
 
 @Injectable()
 export class FrontsService {
@@ -168,9 +168,9 @@ export class FrontsService {
   async getFrontForTask(): Promise<Front> {
     // Assuming 'frontRepository' is your repository object for the 'Front' entity
     const sortedFront = await this.frontRepository.find({
+      where: { taskTotal: Not(frontLength) },
       order: {
-        timeToCompleteAllTasks: 'ASC', // Sort by timeToCompleteAllTasks in ascending order
-        taskTotal: 'ASC', // Then sort by taskTotal in ascending order
+        timeToCompleteAllTasks: 'ASC',
       },
       take: 1,
     });
@@ -212,11 +212,12 @@ export class FrontsService {
             throw new BadRequestException('Front full');
           }
 
-          front.taskTotal = front.taskTotal + 1;
-          front.timeToCompleteAllTasks =
-            front.timeToCompleteAllTasks + frontUpdateObj.timeToCompleteTask;
-
-          await transactionalEntityManager.save(front);
+          await this.updateFrontWithTaskInfo(
+            front,
+            1,
+            frontUpdateObj.timeToCompleteTask,
+            transactionalEntityManager,
+          );
 
           return true;
         },
@@ -320,12 +321,12 @@ export class FrontsService {
             throw new NotFoundException('Front not found');
           }
 
-          // Update front's task total and time to complete all tasks
-          front.taskTotal = front.taskTotal + 1;
-          front.timeToCompleteAllTasks =
-            front.timeToCompleteAllTasks + frontUpdateTaskDto.processedAt;
-
-          await transactionalEntityManager.save(front);
+          await this.updateFrontWithTaskInfo(
+            front,
+            1,
+            frontUpdateTaskDto.processedAt,
+            transactionalEntityManager,
+          );
 
           return true;
         },
@@ -337,5 +338,53 @@ export class FrontsService {
         'Error occurred in addBestTaskToFront: ' + error.message,
       );
     }
+  }
+
+  /**
+   * Updates the time to complete all tasks for a given front.
+   *
+   * @param frontUpdateObj - DTO containing the front ID and the additional time to complete the task.
+   * @returns Promise<boolean> - Returns true if the operation was successful.
+   */
+  async updateFrontTimeToCompleteAllTasks(
+    frontUpdateObj: FrontUpdateTimeAndTasksDTO,
+  ): Promise<boolean> {
+    try {
+      await this.frontRepository
+        .createQueryBuilder()
+        .update()
+        .set({
+          timeToCompleteAllTasks: () =>
+            `timeToCompleteAllTasks + ${frontUpdateObj.timeToCompleteTask}`,
+        })
+        .where('id = :id', { id: frontUpdateObj.frontId })
+        .execute();
+
+      return true;
+    } catch (error) {
+      console.error('Error updating time to complete tasks:', error);
+
+      throw error;
+    }
+  }
+
+  /**
+   * Update the 'front' object with task-related information.
+   * @param front The 'front' object to update.
+   * @param taskCount The number of tasks to add to the 'taskTotal' property.
+   * @param timeToAdd The time to add to the 'timeToCompleteAllTasks' property.
+   */
+  private async updateFrontWithTaskInfo(
+    front: Front,
+    taskCount: number,
+    timeToAdd: number,
+    transactionalEntityManager: EntityManager,
+  ) {
+    // Add to the 'taskTotal' and 'timeToCompleteAllTasks' properties of the 'front' object.
+    front.taskTotal = front.taskTotal + taskCount;
+    front.timeToCompleteAllTasks = front.timeToCompleteAllTasks + timeToAdd;
+
+    // Save the updated 'front' object using the transactionalEntityManager.
+    await transactionalEntityManager.save(front);
   }
 }
