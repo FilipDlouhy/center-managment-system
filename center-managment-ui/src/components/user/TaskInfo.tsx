@@ -61,10 +61,13 @@ function TaskInfo() {
         <TaskDetail title="Status" detail={task.status} />
         <TaskDetail title="Description" detail={task.description} />
         <TaskDetail title="Created at" detail={formatISODate(task.createdAt)} />
-        <TaskDetail
-          title="Will be processed at"
-          detail={formatISODateWithOffset(task.createdAt, task.processedAt)}
-        />
+        {task.status === "scheduled" ||
+          (task.status === "doing" && (
+            <TaskDetail
+              title="Will be processed at"
+              detail={formatISODateWithOffset(task.createdAt, task.processedAt)}
+            />
+          ))}
       </div>
 
       <div className="h-64 flex items-center justify-center w-full">

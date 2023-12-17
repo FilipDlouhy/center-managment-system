@@ -35,6 +35,13 @@ export default function LoginPage() {
       setErrorText("Please fill in all fields.");
       return;
     }
+
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
+    if (!emailRegex.test(formData.email)) {
+      setErrorText("Please enter a valid email address.");
+      return;
+    }
+
     try {
       const response = await axios.post(
         appendToUrl("user/user-login"),

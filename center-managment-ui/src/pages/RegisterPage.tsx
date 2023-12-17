@@ -25,6 +25,8 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
+
     const updatedFormData = {
       ...formData,
       admin: formData.email.toLowerCase().includes("admin"),
@@ -36,6 +38,11 @@ export default function RegisterPage() {
       !updatedFormData.password
     ) {
       setErrorText("Please fill in all fields.");
+      return;
+    }
+
+    if (!emailRegex.test(updatedFormData.email)) {
+      setErrorText("Please enter a valid email address.");
       return;
     }
 

@@ -5,6 +5,22 @@ import { formatISODate, formatISODateWithOffset } from "../../consts/consts";
 export default function TaskAdmin() {
   const context = useContext(CenterSystemContext);
   const { taskAdmin } = context;
+  function getStatusText() {
+    switch (taskAdmin?.status) {
+      case "scheduled":
+      case "doing":
+        return formatISODateWithOffset(
+          taskAdmin?.createdAt,
+          taskAdmin?.processedAt
+        );
+      case "unscheduled":
+        return "Not scheduled";
+      case "done":
+        return "Task had been done";
+      default:
+        return ""; // Or some default text
+    }
+  }
 
   return (
     <div className="flex justify-center p-4">
@@ -18,20 +34,17 @@ export default function TaskAdmin() {
           </p>
           <p className="text-gray-700 font-semibold">
             When it will be processed at:
-            <span className="ml-1 text-gray-600">
-              {formatISODateWithOffset(
-                taskAdmin?.createdAt,
-                taskAdmin?.processedAt
-              )}
-            </span>
+            <span className="ml-1 text-gray-600">{getStatusText()}</span>
           </p>
           <p className="text-gray-700 font-semibold">
             Status:
             <span className="ml-1 text-gray-600">{taskAdmin?.status}</span>
           </p>
-          <p className="text-gray-700 font-semibold">
+          <p className="text-gray-700 font-semibold break-all">
             Description:
-            <span className="ml-1 text-gray-600">{taskAdmin?.description}</span>
+            <span className="ml-1 text-gray-600 break-all">
+              {taskAdmin?.description}
+            </span>
           </p>
         </div>
 

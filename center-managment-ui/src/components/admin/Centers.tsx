@@ -172,8 +172,9 @@ function Centers() {
               <p className="text-lg font-semibold text-gray-700 mb-4">
                 Total estimated time to complete all tasks:
                 <span className="font-normal ml-2">
-                  {(center.front.timeToCompleteAllTasks / 3600000).toFixed(1) +
-                    " h"}
+                  {new Date(center.front.timeToCompleteAllTasks)
+                    .toISOString()
+                    .substr(11, 8) + " h"}
                 </span>
               </p>
               <p className="text-lg font-semibold text-gray-700">
@@ -183,7 +184,7 @@ function Centers() {
                 </span>
               </p>
             </div>
-            <div className="w-full h-96">
+            <div className="w-full h-96 flex">
               {center.front.tasks.map((task) => (
                 <Task
                   key={task.id}

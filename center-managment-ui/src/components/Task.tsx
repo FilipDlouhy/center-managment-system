@@ -12,7 +12,7 @@ function Task({ description, id }: TaskSampleDto) {
   return (
     <div className="w-64 h-64 shadow-xl rounded-xl m-4 p-4 flex flex-col justify-around items-center">
       <h2 className="text-lg font-semibold mb-2">Task Description</h2>
-      <p className="text-gray-600 text-center">{description}</p>
+      <p className="text-gray-600 text-center break-all">{description}</p>
       <button
         onClick={async () => {
           try {
