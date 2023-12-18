@@ -757,6 +757,17 @@ export class TasksService implements OnModuleInit {
     return await this.taskRepository.save(newTask);
   }
 
+  /**
+   * This function is responsible for sending the first task to do in your Nest.js API.
+   * It takes in a set of parameters and performs several operations, including updating the front,
+   * creating a new task, and sending a message to the center.
+   *
+   * @param createTaskDto - The DTO (Data Transfer Object) containing information about the task to be created.
+   * @param user - The user associated with the task.
+   * @param front - The front associated with the task.
+   * @param timeToCompleteTask - The time required to complete the task.
+   * @returns A promise that resolves with the newly created task.
+   */
   async sendFirstTaskToDo(
     createTaskDto: CreateTaskDto,
     user: User,

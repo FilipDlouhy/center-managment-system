@@ -58,3 +58,9 @@ or done. As a user you can also create task and watch its progress. As admin you
 # Tasks generating
 
 When you initially install the system you can only invoke initSystem.js once because it would fail on adding admin user also you can do `node .\createCenter.js` which generates centers if you have too much tasks center when created is automattically filled with unscheduled tasks or `node .\generateRequerementsAndUsers.js` which generates users with one task
+
+## Problems for me
+
+Overall architecture: I strugelled a bit how to do it before i landed on the 4 microservice and api gateway solution.
+
+Docker: This the greatest challange for me in this project nad by the end of this i still dont 100% know how to use it.
